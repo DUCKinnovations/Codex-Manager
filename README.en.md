@@ -20,25 +20,6 @@ A local desktop + service toolkit for managing a Codex-compatible ChatGPT accoun
 - Import compatibility upgrade: supports `tokens.*`, flat top-level token fields, and camelCase variants (`accessToken/idToken/refreshToken`) with auto-detection.
 - Backward compatibility for older service builds: frontend now normalizes flat token payloads before import to avoid `missing field: tokens`.
 
-### 2026-03-01 (v0.1.3)
-- Settings page restructure: switched to a single-sheet layout, added a dedicated "Background Tasks" section (polling toggles/intervals + worker parameters), and improved in-page hints.
-- Added background-task config chain end-to-end: frontend -> Tauri -> RPC now supports `gateway/backgroundTasks/get|set`, so usage polling, gateway keepalive, token-refresh polling, and worker parameters can be managed from Settings.
-- Improved runtime behavior for background tasks: polling parameters can be hot-updated at runtime; `usageRefreshWorkers`, `httpWorkerFactor/httpWorkerMin`, and `httpStreamWorkerFactor/httpStreamWorkerMin` now clearly indicate "service restart required".
-- Refresh error UX optimization: automatic refresh failures no longer spam error toasts (logged as warnings instead); manual refresh shows failed task names plus one sample error.
-- Gateway compatibility fixes: improved `/v1/responses` behavior for no-cookie recovery, codex parameter allowlist, and transparent passthrough for non-codex requests; multi-account rotation + failover behavior is more stable.
-- Routing and availability fixes: unavailable accounts are excluded from candidate pools; fixed manual account lock being pre-skipped; improved double-Codex session isolation and stream cutoff logging.
-
-### v0.1.3 (cumulative features)
-- Added Service one-click launcher `codexmanager-start`: one process starts `service + web`, and supports coordinated shutdown via `Ctrl+C`.
-- Added `embedded-ui` mode for Service `codexmanager-web`: frontend static assets are embedded into the binary, so no extra `web/` folder is required after unzip.
-- Added Docker deployment for standalone Service/Web plus `docker-compose` orchestration for headless environments.
-- Added Azure OpenAI protocol support: platform keys can now use `azure_openai` with dedicated endpoint configuration and Azure API key authentication flow.
-- Startup speed optimization: startup now uses a local-first load path (accounts/usage/models from local storage first), with model list local cache plus background on-demand refresh (immediate pull when cache is empty, then periodic refresh), significantly reducing first-screen wait time.
-- Gateway modular refactor: `gateway` is now organized into `auth/core/request/routing/observability/upstream`, improving maintainability and troubleshooting speed.
-- Refresh UX upgrade: “Refresh All” now shows progress (completed/remaining) with stable busy-state handling to avoid “clicked but no feedback” perception.
-- Gateway observability: capped `http_bridge` output accumulation; added `/metrics` to expose DB busy, HTTP queue depth, upstream attempt latency, etc.
-- Release flow speed & safety: manual-only workflows across platforms; unified Tauri CLI version; tag/version consistency checks; release assets include `SHA256SUMS`/`manifest.json`; upload-artifact compression disabled; concurrency is scoped by `workflow+tag` to avoid cross-workflow cancellations; release-create races automatically fall back to `edit + upload`.
-
 ## Features
 - Account pool management: group, tag, sort, note
 - Usage dashboard: supports 5-hour + 7-day dual windows, and accounts that only return a 7-day single window (for example free weekly quota)

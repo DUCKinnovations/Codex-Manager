@@ -20,17 +20,6 @@
 - 导入兼容增强：支持 `tokens.*`、顶层 `*_token`、camelCase 字段（如 `accessToken/idToken/refreshToken`）自动识别。
 - 兼容旧 service：前端导入前会自动归一化顶层 token 格式，避免旧版后端报 `missing field: tokens`。
 
-### 2026-03-01（v0.1.3）
-- 设置页重构：改为单页聚合布局，新增“后台任务”配置区（轮询开关/间隔 + worker 参数），并补齐中文文案与悬浮提示。
-- 新增后台任务配置链路：前端 -> Tauri -> RPC 打通 `gateway/backgroundTasks/get|set`，可在设置页统一管理用量轮询、网关保活、令牌刷新轮询与 worker 参数。
-- 后台任务运行时行为增强：轮询类参数支持运行中热更新；`usageRefreshWorkers`、`httpWorkerFactor/httpWorkerMin`、`httpStreamWorkerFactor/httpStreamWorkerMin` 会提示“需重启 service 生效”。
-- 全量刷新提示优化：自动刷新失败不再频繁弹错误 toast（改为日志告警）；手动刷新时才提示失败项名称和示例错误，减少“后台任务一直报错”的干扰。
-- 网关兼容性修复：针对 `/v1/responses` 完成 no-cookie 场景恢复、参数白名单与非 codex 请求透传，多账号轮转 + failover 下的降级行为更稳定。
-- 选路与可用性修复：不可用账号不进入候选池；修复“手动锁定账号被预跳过导致不生效”；补强双 Codex 并发会话隔离与流式断流日志。
-- 新增 Service 一键启动器 `codexmanager-start`：单进程拉起 `service + web`，支持 `Ctrl+C` 联动关闭，降低“多进程手工启动”成本。
-- Service 版 `codexmanager-web` 支持 `embedded-ui`：前端静态资源内嵌进二进制，解压后无需额外 `web/` 目录。
-- 新增 Service/Web Docker 独立部署与 `docker-compose` 编排，支持无桌面环境部署。
-
 ## 功能概览
 - 账号池管理：分组、标签、排序、备注
 - 用量展示：兼容 5 小时 + 7 日双窗口，以及仅返回 7 日单窗口（如免费周额度）的账号
