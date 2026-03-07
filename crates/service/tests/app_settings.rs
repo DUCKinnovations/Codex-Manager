@@ -1,5 +1,6 @@
 use codexmanager_core::storage::{now_ts, Storage};
 use serde_json::json;
+use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -59,6 +60,44 @@ fn with_temp_db(test: impl FnOnce(&PathBuf)) {
         std::env::remove_var("CODEXMANAGER_DB_PATH");
     }
     let _ = std::fs::remove_file(&db_path);
+}
+
+struct EnvRestore(Vec<(String, Option<OsString>)>);
+
+impl Drop for EnvRestore {
+    fn drop(&mut self) {
+        for (key, value) in self.0.drain(..) {
+            if let Some(value) = value {
+                std::env::set_var(&key, value);
+            } else {
+                std::env::remove_var(&key);
+            }
+        }
+    }
+}
+
+fn override_env_vars(vars: &[(&str, Option<&str>)]) -> EnvRestore {
+    let previous = vars
+        .iter()
+        .map(|(key, _)| ((*key).to_string(), std::env::var_os(key)))
+        .collect::<Vec<_>>();
+    for (key, value) in vars {
+        if let Some(value) = value {
+            std::env::set_var(key, value);
+        } else {
+            std::env::remove_var(key);
+        }
+    }
+    EnvRestore(previous)
+}
+
+fn read_env_overrides_map(db_path: &PathBuf) -> serde_json::Map<String, serde_json::Value> {
+    let storage = Storage::open(db_path).expect("open storage");
+    let raw = storage
+        .get_app_setting(codexmanager_service::APP_SETTING_ENV_OVERRIDES_KEY)
+        .expect("read env overrides")
+        .expect("env overrides exists");
+    serde_json::from_str(&raw).expect("parse env overrides json")
 }
 
 #[test]
@@ -249,12 +288,130 @@ fn sync_runtime_settings_from_storage_applies_saved_runtime_values() {
 }
 
 #[test]
+fn app_settings_get_loads_env_backed_dedicated_settings_when_storage_missing() {
+    with_temp_db(|db_path| {
+        let storage = Storage::open(db_path).expect("open storage");
+        for key in [
+            codexmanager_service::APP_SETTING_SERVICE_ADDR_KEY,
+            codexmanager_service::SERVICE_BIND_MODE_SETTING_KEY,
+            codexmanager_service::APP_SETTING_GATEWAY_ROUTE_STRATEGY_KEY,
+            codexmanager_service::APP_SETTING_GATEWAY_CPA_NO_COOKIE_HEADER_MODE_KEY,
+            codexmanager_service::APP_SETTING_GATEWAY_UPSTREAM_PROXY_URL_KEY,
+            codexmanager_service::APP_SETTING_GATEWAY_BACKGROUND_TASKS_KEY,
+        ] {
+            storage.delete_app_setting(key).expect("delete app setting");
+        }
+        drop(storage);
+
+        let _env = override_env_vars(&[
+            ("CODEXMANAGER_SERVICE_ADDR", Some("0.0.0.0:4999")),
+            ("CODEXMANAGER_ROUTE_STRATEGY", Some("balanced")),
+            ("CODEXMANAGER_CPA_NO_COOKIE_HEADER_MODE", Some("1")),
+            (
+                "CODEXMANAGER_UPSTREAM_PROXY_URL",
+                Some("http://127.0.0.1:7899"),
+            ),
+            ("CODEXMANAGER_USAGE_POLLING_ENABLED", Some("0")),
+            ("CODEXMANAGER_USAGE_POLL_INTERVAL_SECS", Some("777")),
+            ("CODEXMANAGER_GATEWAY_KEEPALIVE_ENABLED", Some("0")),
+            ("CODEXMANAGER_GATEWAY_KEEPALIVE_INTERVAL_SECS", Some("240")),
+            ("CODEXMANAGER_TOKEN_REFRESH_POLLING_ENABLED", Some("0")),
+            ("CODEXMANAGER_TOKEN_REFRESH_POLL_INTERVAL_SECS", Some("120")),
+            ("CODEXMANAGER_USAGE_REFRESH_WORKERS", Some("6")),
+            ("CODEXMANAGER_HTTP_WORKER_FACTOR", Some("5")),
+            ("CODEXMANAGER_HTTP_WORKER_MIN", Some("9")),
+            ("CODEXMANAGER_HTTP_STREAM_WORKER_FACTOR", Some("2")),
+            ("CODEXMANAGER_HTTP_STREAM_WORKER_MIN", Some("3")),
+        ]);
+
+        let snapshot = codexmanager_service::app_settings_get().expect("get app settings");
+
+        assert_eq!(
+            snapshot.get("serviceAddr").and_then(|value| value.as_str()),
+            Some("localhost:4999")
+        );
+        assert_eq!(
+            snapshot
+                .get("serviceListenMode")
+                .and_then(|value| value.as_str()),
+            Some(codexmanager_service::SERVICE_BIND_MODE_ALL_INTERFACES)
+        );
+        assert_eq!(
+            snapshot
+                .get("routeStrategy")
+                .and_then(|value| value.as_str()),
+            Some("balanced")
+        );
+        assert_eq!(
+            snapshot
+                .get("cpaNoCookieHeaderModeEnabled")
+                .and_then(|value| value.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            snapshot
+                .get("upstreamProxyUrl")
+                .and_then(|value| value.as_str()),
+            Some("http://127.0.0.1:7899")
+        );
+        assert_eq!(
+            snapshot
+                .get("backgroundTasks")
+                .and_then(|value| value.get("usagePollingEnabled"))
+                .and_then(|value| value.as_bool()),
+            Some(false)
+        );
+        assert_eq!(
+            snapshot
+                .get("backgroundTasks")
+                .and_then(|value| value.get("usagePollIntervalSecs"))
+                .and_then(|value| value.as_u64()),
+            Some(777)
+        );
+        assert_eq!(
+            snapshot
+                .get("backgroundTasks")
+                .and_then(|value| value.get("gatewayKeepaliveEnabled"))
+                .and_then(|value| value.as_bool()),
+            Some(false)
+        );
+        assert_eq!(
+            snapshot
+                .get("backgroundTasks")
+                .and_then(|value| value.get("tokenRefreshPollIntervalSecs"))
+                .and_then(|value| value.as_u64()),
+            Some(120)
+        );
+
+        let storage = Storage::open(db_path).expect("open storage");
+        assert_eq!(
+            storage
+                .get_app_setting(codexmanager_service::APP_SETTING_SERVICE_ADDR_KEY)
+                .expect("read service addr"),
+            Some("localhost:4999".to_string())
+        );
+        assert_eq!(
+            storage
+                .get_app_setting(codexmanager_service::SERVICE_BIND_MODE_SETTING_KEY)
+                .expect("read service bind mode"),
+            Some(codexmanager_service::SERVICE_BIND_MODE_ALL_INTERFACES.to_string())
+        );
+        assert_eq!(
+            storage
+                .get_app_setting(codexmanager_service::APP_SETTING_GATEWAY_ROUTE_STRATEGY_KEY)
+                .expect("read route strategy"),
+            Some("balanced".to_string())
+        );
+    });
+}
+
+#[test]
 fn app_settings_set_persists_env_overrides_and_exposes_catalog() {
     with_temp_db(|db_path| {
         let snapshot = codexmanager_service::app_settings_set(Some(&json!({
             "envOverrides": {
                 "CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS": "321000",
-                "CODEXMANAGER_UPSTREAM_BASE_URL": "https://chatgpt.com"
+                "CODEXMANAGER_UPSTREAM_COOKIE": "cf_clearance=test"
             }
         })))
         .expect("save env overrides");
@@ -267,21 +424,46 @@ fn app_settings_set_persists_env_overrides_and_exposes_catalog() {
             Some("321000")
         );
         assert_eq!(
+            snapshot
+                .get("envOverrides")
+                .and_then(|value| value.get("CODEXMANAGER_UPSTREAM_COOKIE"))
+                .and_then(|value| value.as_str()),
+            Some("cf_clearance=test")
+        );
+        assert_eq!(
+            snapshot
+                .get("envOverrides")
+                .and_then(|value| value.get("CODEXMANAGER_LOGIN_ADDR"))
+                .and_then(|value| value.as_str()),
+            Some("localhost:1455")
+        );
+        assert_eq!(
             std::env::var("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS")
                 .ok()
                 .as_deref(),
             Some("321000")
         );
-        assert_eq!(
-            std::env::var("CODEXMANAGER_UPSTREAM_BASE_URL")
-                .ok()
-                .as_deref(),
-            Some("https://chatgpt.com")
-        );
-        assert!(snapshot
+        let catalog = snapshot
             .get("envOverrideCatalog")
             .and_then(|value| value.as_array())
-            .is_some_and(|items| !items.is_empty()));
+            .expect("catalog array");
+        let total_timeout = catalog
+            .iter()
+            .find(|item| {
+                item.get("key").and_then(|value| value.as_str())
+                    == Some("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS")
+            })
+            .expect("catalog item");
+        assert_eq!(
+            total_timeout.get("label").and_then(|value| value.as_str()),
+            Some("上游总超时（毫秒）")
+        );
+        assert_eq!(
+            total_timeout
+                .get("defaultValue")
+                .and_then(|value| value.as_str()),
+            Some("120000")
+        );
         assert!(snapshot
             .get("envOverrideReservedKeys")
             .and_then(|value| value.as_array())
@@ -289,12 +471,119 @@ fn app_settings_set_persists_env_overrides_and_exposes_catalog() {
                 .iter()
                 .any(|item| item.as_str() == Some("CODEXMANAGER_ROUTE_STRATEGY"))));
 
-        let storage = Storage::open(db_path).expect("open storage");
-        let stored = storage
-            .get_app_setting(codexmanager_service::APP_SETTING_ENV_OVERRIDES_KEY)
-            .expect("read env overrides")
-            .expect("env overrides exists");
-        assert!(stored.contains("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS"));
+        let stored = read_env_overrides_map(db_path);
+        assert_eq!(
+            stored
+                .get("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS")
+                .and_then(|value| value.as_str()),
+            Some("321000")
+        );
+        assert_eq!(
+            stored
+                .get("CODEXMANAGER_UPSTREAM_COOKIE")
+                .and_then(|value| value.as_str()),
+            Some("cf_clearance=test")
+        );
+        assert_eq!(
+            stored
+                .get("CODEXMANAGER_LOGIN_ADDR")
+                .and_then(|value| value.as_str()),
+            Some("localhost:1455")
+        );
+        assert!(stored.len() >= 40);
+    });
+}
+
+#[test]
+fn app_settings_get_seeds_full_env_override_snapshot() {
+    with_temp_db(|db_path| {
+        std::env::remove_var("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS");
+        std::env::remove_var("CODEXMANAGER_WEB_ROOT");
+
+        let snapshot = codexmanager_service::app_settings_get().expect("get app settings");
+
+        assert_eq!(
+            snapshot
+                .get("envOverrides")
+                .and_then(|value| value.get("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS"))
+                .and_then(|value| value.as_str()),
+            Some("120000")
+        );
+        assert_eq!(
+            snapshot
+                .get("envOverrides")
+                .and_then(|value| value.get("CODEXMANAGER_WEB_ROOT"))
+                .and_then(|value| value.as_str()),
+            Some("")
+        );
+
+        let stored = read_env_overrides_map(db_path);
+        assert_eq!(
+            stored
+                .get("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS")
+                .and_then(|value| value.as_str()),
+            Some("120000")
+        );
+        assert_eq!(
+            stored
+                .get("CODEXMANAGER_WEB_ROOT")
+                .and_then(|value| value.as_str()),
+            Some("")
+        );
+    });
+}
+
+#[test]
+fn app_settings_set_env_overrides_patch_preserves_other_values_and_reset_to_default() {
+    with_temp_db(|_| {
+        let first = codexmanager_service::app_settings_set(Some(&json!({
+            "envOverrides": {
+                "CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS": "321000",
+                "CODEXMANAGER_UPSTREAM_COOKIE": "cf_clearance=test"
+            }
+        })))
+        .expect("save first env overrides");
+        assert_eq!(
+            first
+                .get("envOverrides")
+                .and_then(|value| value.get("CODEXMANAGER_UPSTREAM_COOKIE"))
+                .and_then(|value| value.as_str()),
+            Some("cf_clearance=test")
+        );
+
+        let second = codexmanager_service::app_settings_set(Some(&json!({
+            "envOverrides": {
+                "CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS": ""
+            }
+        })))
+        .expect("reset timeout to default");
+
+        assert_eq!(
+            second
+                .get("envOverrides")
+                .and_then(|value| value.get("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS"))
+                .and_then(|value| value.as_str()),
+            Some("120000")
+        );
+        assert_eq!(
+            second
+                .get("envOverrides")
+                .and_then(|value| value.get("CODEXMANAGER_UPSTREAM_COOKIE"))
+                .and_then(|value| value.as_str()),
+            Some("cf_clearance=test")
+        );
+        assert_eq!(
+            std::env::var("CODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS")
+                .ok()
+                .as_deref(),
+            Some("120000")
+        );
+        assert_eq!(
+            std::env::var("CODEXMANAGER_UPSTREAM_COOKIE")
+                .ok()
+                .as_deref(),
+            Some("cf_clearance=test")
+        );
     });
 }
 

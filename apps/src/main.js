@@ -24,11 +24,13 @@ import { setStatus, setServiceHint } from "./ui/status";
 import { createFeedbackHandlers } from "./ui/feedback";
 import { createThemeController } from "./ui/theme";
 import {
-  formatEnvOverridesText,
+  buildEnvOverrideDescription,
+  buildEnvOverrideOptionLabel,
+  filterEnvOverrideCatalog,
+  formatEnvOverrideDisplayValue,
   normalizeEnvOverrideCatalog,
   normalizeEnvOverrides,
   normalizeStringList,
-  parseEnvOverridesText,
 } from "./ui/env-overrides";
 import { withButtonBusy } from "./ui/button-busy";
 import { createStartupMaskController } from "./ui/startup-mask";
@@ -179,6 +181,7 @@ let upstreamProxySyncedProbeId = -1;
 let backgroundTasksSyncInFlight = null;
 let backgroundTasksSyncedProbeId = -1;
 let apiModelsRemoteRefreshInFlight = null;
+let envOverrideSelectedKey = "";
 let appSettingsSnapshot = buildDefaultAppSettingsSnapshot();
 
 function buildDefaultAppSettingsSnapshot() {
@@ -1153,130 +1156,139 @@ function saveEnvOverridesSetting(value) {
   });
 }
 
-function setEnvOverridesInput(value) {
-  if (!dom.envOverridesInput) {
-    return;
-  }
-  dom.envOverridesInput.value = formatEnvOverridesText(value);
-}
-
 function setEnvOverridesHint(message) {
   if (!dom.envOverridesHint) {
     return;
   }
   dom.envOverridesHint.textContent = String(message || "").trim()
-    || "保存后会回灌到当前 service 进程；启动类配置通常需要重启。";
+    || "选择变量后可直接修改值；恢复默认会回退到启动时环境值或内置默认值。";
 }
 
-function renderEnvOverrideChipList(element, entries, { mode } = {}) {
-  if (!element) {
+function setEnvOverrideDescription(message) {
+  if (!dom.envOverrideDescription) {
     return;
   }
-  element.replaceChildren();
-  const items = Array.isArray(entries) ? entries : [];
-  if (items.length === 0) {
-    const empty = document.createElement("span");
-    empty.className = "hint";
-    empty.textContent = "无";
-    element.appendChild(empty);
-    return;
-  }
-  for (const item of items) {
-    const chip = document.createElement("code");
-    chip.className = "settings-env-chip";
-    chip.textContent = item.key || item;
-    if (item && typeof item === "object") {
-      chip.dataset.mode = item.applyMode || mode || "";
-      chip.dataset.scope = item.scope || "";
-      chip.title = `${item.scope || "service"} / ${item.applyMode || mode || "runtime"}`;
-    } else if (mode) {
-      chip.dataset.mode = mode;
-    }
-    element.appendChild(chip);
-  }
+  dom.envOverrideDescription.textContent = String(message || "").trim()
+    || "这里会显示当前变量的作用说明。";
 }
 
-function renderEnvOverrideCatalog() {
-  const catalog = Array.isArray(appSettingsSnapshot.envOverrideCatalog)
-    ? appSettingsSnapshot.envOverrideCatalog
-    : [];
-  renderEnvOverrideChipList(
-    dom.envOverrideCatalogRuntime,
-    catalog.filter((item) => item.applyMode === "runtime"),
-    { mode: "runtime" },
-  );
-  renderEnvOverrideChipList(
-    dom.envOverrideCatalogRestart,
-    catalog.filter((item) => item.applyMode === "restart"),
-    { mode: "restart" },
-  );
-  renderEnvOverrideChipList(dom.envOverrideReservedKeys, appSettingsSnapshot.envOverrideReservedKeys);
-  renderEnvOverrideChipList(dom.envOverrideUnsupportedKeys, appSettingsSnapshot.envOverrideUnsupportedKeys);
+function readEnvOverrideCatalog() {
+  return normalizeEnvOverrideCatalog(appSettingsSnapshot.envOverrideCatalog);
 }
 
-function validateEnvOverridesForSave(overrides) {
-  const keys = Object.keys(normalizeEnvOverrides(overrides));
-  const unsupported = new Set(appSettingsSnapshot.envOverrideUnsupportedKeys || []);
-  const reserved = new Set(appSettingsSnapshot.envOverrideReservedKeys || []);
-  const unsupportedKeys = keys.filter((key) => unsupported.has(key));
-  if (unsupportedKeys.length > 0) {
-    return `以下键不能改为数据库配置：${unsupportedKeys.join("、")}`;
-  }
-  const reservedKeys = keys.filter((key) => reserved.has(key));
-  if (reservedKeys.length > 0) {
-    return `以下键已有专用设置项，请在对应卡片中修改：${reservedKeys.join("、")}`;
-  }
-  return "";
+function findEnvOverrideCatalogItem(key, catalog = readEnvOverrideCatalog()) {
+  const normalizedKey = String(key || "").trim().toUpperCase();
+  return catalog.find((item) => item.key === normalizedKey) || null;
 }
 
-function buildEnvOverridesSaveHint(previousOverrides, nextOverrides) {
-  const previous = normalizeEnvOverrides(previousOverrides);
-  const next = normalizeEnvOverrides(nextOverrides);
-  const changedKeys = [...new Set([...Object.keys(previous), ...Object.keys(next)])]
-    .filter((key) => previous[key] !== next[key]);
-  if (changedKeys.length === 0) {
-    return "配置未变化。";
-  }
-
-  const catalog = new Map(
-    (Array.isArray(appSettingsSnapshot.envOverrideCatalog) ? appSettingsSnapshot.envOverrideCatalog : [])
-      .map((item) => [item.key, item]),
+function resolveEnvOverrideSelection(preferredKey) {
+  const catalog = filterEnvOverrideCatalog(
+    readEnvOverrideCatalog(),
+    dom.envOverrideSearchInput ? dom.envOverrideSearchInput.value : "",
   );
-  const restartKeys = [];
-  const unknownKeys = [];
-  for (const key of changedKeys) {
-    const item = catalog.get(key);
-    if (!item) {
-      unknownKeys.push(key);
-      continue;
-    }
-    if (item.applyMode === "restart") {
-      restartKeys.push(key);
-    }
+  const nextKey = [preferredKey, envOverrideSelectedKey]
+    .map((item) => String(item || "").trim().toUpperCase())
+    .find((key) => key && catalog.some((item) => item.key === key))
+    || (catalog[0] ? catalog[0].key : "");
+
+  envOverrideSelectedKey = nextKey;
+  return {
+    catalog,
+    selectedItem: catalog.find((item) => item.key === nextKey) || null,
+  };
+}
+
+function buildEnvOverrideHint(item, currentValue, prefix = "") {
+  if (!item) {
+    return prefix || "请输入搜索词并从下拉中选择一个变量。";
+  }
+  const scopeLabel = item.scope === "web"
+    ? "Web"
+    : item.scope === "desktop"
+      ? "桌面端"
+      : "服务端";
+  const parts = [];
+  if (prefix) {
+    parts.push(prefix);
+  }
+  parts.push(`默认值：${formatEnvOverrideDisplayValue(item.defaultValue)}`);
+  parts.push(`当前值：${formatEnvOverrideDisplayValue(currentValue)}`);
+  parts.push(`作用域：${scopeLabel}`);
+  parts.push(item.applyMode === "restart" ? "保存后需重启相关进程" : "保存后热生效");
+  return parts.join("；");
+}
+
+function renderEnvOverrideSelector(preferredKey = envOverrideSelectedKey) {
+  const { catalog, selectedItem } = resolveEnvOverrideSelection(preferredKey);
+  if (!dom.envOverrideSelect) {
+    return selectedItem;
   }
 
-  if (restartKeys.length === 0 && unknownKeys.length === 0) {
-    return "已保存并回灌到当前 service 进程。";
+  dom.envOverrideSelect.replaceChildren();
+  if (catalog.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "未匹配到变量";
+    dom.envOverrideSelect.appendChild(option);
+    dom.envOverrideSelect.disabled = true;
+    dom.envOverrideSelect.value = "";
+    return null;
   }
 
-  const parts = ["已保存"];
-  if (restartKeys.length > 0) {
-    const preview = restartKeys.slice(0, 6).join("、");
-    const suffix = restartKeys.length > 6 ? ` 等 ${restartKeys.length} 项` : "";
-    parts.push(`以下键需重启相关进程后完整生效：${preview}${suffix}`);
+  for (const item of catalog) {
+    const option = document.createElement("option");
+    option.value = item.key;
+    option.textContent = buildEnvOverrideOptionLabel(item);
+    dom.envOverrideSelect.appendChild(option);
   }
-  if (unknownKeys.length > 0) {
-    const preview = unknownKeys.slice(0, 4).join("、");
-    const suffix = unknownKeys.length > 4 ? ` 等 ${unknownKeys.length} 项` : "";
-    parts.push(`未识别键会按原样保存：${preview}${suffix}`);
+  dom.envOverrideSelect.disabled = false;
+  dom.envOverrideSelect.value = selectedItem ? selectedItem.key : catalog[0].key;
+  return selectedItem;
+}
+
+function renderEnvOverrideEditor(preferredKey = envOverrideSelectedKey, hint = "") {
+  const item = renderEnvOverrideSelector(preferredKey);
+  const overrides = readEnvOverridesSetting();
+  const currentValue = item ? (overrides[item.key] ?? item.defaultValue ?? "") : "";
+
+  if (dom.envOverrideNameValue) {
+    dom.envOverrideNameValue.textContent = item ? item.label : "未选择";
   }
-  return `${parts.join("；")}。`;
+  if (dom.envOverrideKeyValue) {
+    dom.envOverrideKeyValue.textContent = item ? item.key : "-";
+  }
+  if (dom.envOverrideMeta) {
+    const scopeLabel = item?.scope === "web"
+      ? "Web"
+      : item?.scope === "desktop"
+        ? "桌面端"
+        : "服务端";
+    dom.envOverrideMeta.textContent = item
+      ? `${scopeLabel} · ${item.applyMode === "restart" ? "重启生效" : "热生效"}`
+      : "请先选择变量";
+  }
+  if (dom.envOverrideValueInput) {
+    dom.envOverrideValueInput.disabled = !item;
+    dom.envOverrideValueInput.value = item ? currentValue : "";
+    dom.envOverrideValueInput.placeholder = item
+      ? "留空并保存可恢复默认值"
+      : "请先选择变量";
+  }
+  if (dom.envOverridesSave) {
+    dom.envOverridesSave.disabled = !item;
+  }
+  if (dom.envOverrideReset) {
+    dom.envOverrideReset.disabled = !item;
+  }
+
+  setEnvOverridesHint(hint || buildEnvOverrideHint(item, currentValue));
+  setEnvOverrideDescription(buildEnvOverrideDescription(item));
+  return item;
 }
 
 function initEnvOverridesSetting() {
-  setEnvOverridesInput(readEnvOverridesSetting());
-  renderEnvOverrideCatalog();
-  setEnvOverridesHint("保存后会回灌到当前 service 进程；启动类配置通常需要重启。");
+  envOverrideSelectedKey = "";
+  renderEnvOverrideEditor("", "选择变量后可直接修改值；恢复默认会回退到启动时环境值或内置默认值。");
 }
 
 function buildWebAccessPasswordStatusText(configured) {
@@ -2388,38 +2400,99 @@ function bindEvents() {
     dom.envOverridesSave.dataset.bound = "1";
     dom.envOverridesSave.addEventListener("click", () => {
       void withButtonBusy(dom.envOverridesSave, "保存中...", async () => {
-        const previousOverrides = readEnvOverridesSetting();
-        const parsed = parseEnvOverridesText(dom.envOverridesInput ? dom.envOverridesInput.value : "");
-        if (!parsed.ok) {
-          setEnvOverridesHint(parsed.error);
-          showToast(parsed.error, "error");
+        const item = findEnvOverrideCatalogItem(envOverrideSelectedKey);
+        if (!item) {
+          const message = "请先选择一个环境变量";
+          setEnvOverridesHint(message);
+          showToast(message, "error");
           return;
         }
-        const validationError = validateEnvOverridesForSave(parsed.overrides);
-        if (validationError) {
-          setEnvOverridesHint(validationError);
-          showToast(validationError, "error");
+        const nextValue = dom.envOverrideValueInput
+          ? dom.envOverrideValueInput.value.trim()
+          : "";
+        const currentValue = readEnvOverridesSetting()[item.key] ?? item.defaultValue ?? "";
+        if (nextValue === currentValue) {
+          const message = buildEnvOverrideHint(item, currentValue, "配置未变化");
+          setEnvOverridesHint(message);
+          showToast("配置未变化");
           return;
         }
-        saveEnvOverridesSetting(parsed.overrides);
-        setEnvOverridesInput(parsed.overrides);
         try {
           const settings = await saveAppSettingsPatch({
-            envOverrides: parsed.overrides,
+            envOverrides: {
+              [item.key]: nextValue,
+            },
           });
           const resolved = normalizeEnvOverrides(settings.envOverrides);
           saveEnvOverridesSetting(resolved);
-          setEnvOverridesInput(resolved);
-          renderEnvOverrideCatalog();
-          setEnvOverridesHint(buildEnvOverridesSaveHint(previousOverrides, resolved));
+          renderEnvOverrideEditor(
+            item.key,
+            buildEnvOverrideHint(
+              findEnvOverrideCatalogItem(item.key, normalizeEnvOverrideCatalog(settings.envOverrideCatalog))
+                || item,
+              resolved[item.key] ?? nextValue,
+              "已保存",
+            ),
+          );
           showToast("高级环境变量已保存");
         } catch (err) {
-          saveEnvOverridesSetting(previousOverrides);
-          setEnvOverridesInput(previousOverrides);
           setEnvOverridesHint(`保存失败：${normalizeErrorMessage(err)}`);
           showToast(`保存失败：${normalizeErrorMessage(err)}`, "error");
         }
       });
+    });
+  }
+  if (dom.envOverrideReset && dom.envOverrideReset.dataset.bound !== "1") {
+    dom.envOverrideReset.dataset.bound = "1";
+    dom.envOverrideReset.addEventListener("click", () => {
+      void withButtonBusy(dom.envOverrideReset, "恢复中...", async () => {
+        const item = findEnvOverrideCatalogItem(envOverrideSelectedKey);
+        if (!item) {
+          const message = "请先选择一个环境变量";
+          setEnvOverridesHint(message);
+          showToast(message, "error");
+          return;
+        }
+        try {
+          const settings = await saveAppSettingsPatch({
+            envOverrides: {
+              [item.key]: "",
+            },
+          });
+          const resolved = normalizeEnvOverrides(settings.envOverrides);
+          saveEnvOverridesSetting(resolved);
+          renderEnvOverrideEditor(
+            item.key,
+            buildEnvOverrideHint(item, resolved[item.key] ?? item.defaultValue ?? "", "已恢复默认"),
+          );
+          showToast("已恢复默认值");
+        } catch (err) {
+          setEnvOverridesHint(`恢复默认失败：${normalizeErrorMessage(err)}`);
+          showToast(`恢复默认失败：${normalizeErrorMessage(err)}`, "error");
+        }
+      });
+    });
+  }
+  if (dom.envOverrideSearchInput && dom.envOverrideSearchInput.dataset.bound !== "1") {
+    dom.envOverrideSearchInput.dataset.bound = "1";
+    dom.envOverrideSearchInput.addEventListener("input", () => {
+      renderEnvOverrideEditor("");
+    });
+  }
+  if (dom.envOverrideSelect && dom.envOverrideSelect.dataset.bound !== "1") {
+    dom.envOverrideSelect.dataset.bound = "1";
+    dom.envOverrideSelect.addEventListener("change", () => {
+      renderEnvOverrideEditor(dom.envOverrideSelect ? dom.envOverrideSelect.value : "");
+    });
+  }
+  if (dom.envOverrideValueInput && dom.envOverrideValueInput.dataset.bound !== "1") {
+    dom.envOverrideValueInput.dataset.bound = "1";
+    dom.envOverrideValueInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+      event.preventDefault();
+      dom.envOverridesSave?.click();
     });
   }
   if (dom.serviceAddrInput && dom.serviceAddrInput.dataset.bound !== "1") {

@@ -210,6 +210,10 @@ pub(crate) fn set_background_tasks_settings(
     background_tasks_settings()
 }
 
+pub(crate) fn reload_background_tasks_runtime_from_env() {
+    reload_background_tasks_from_env();
+}
+
 fn ensure_background_tasks_config_loaded() {
     let _ = BACKGROUND_TASKS_CONFIG_LOADED.get_or_init(|| reload_background_tasks_from_env());
 }

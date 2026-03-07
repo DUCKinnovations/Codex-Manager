@@ -219,11 +219,26 @@
     grid-template-columns: 1fr;
   }
 
-  .settings-inline-textarea {
-    min-height: 152px;
+  .settings-row-actions .hint {
+    min-width: 0;
   }
 
-  .settings-row-actions .hint {
+  .settings-env-toolbar,
+  .settings-env-edit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-env-active-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-env-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settings-env-actions > button {
     min-width: 0;
   }
 

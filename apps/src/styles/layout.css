@@ -558,78 +558,158 @@
 }
 
 .settings-card-env {
-    gap: 10px;
+    gap: 14px;
 }
 
-.settings-inline-textarea {
-    width: 100%;
-    min-height: 176px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: #fff;
-    font-size: 12px;
-    line-height: 1.55;
-    resize: vertical;
-}
-
-.settings-env-details {
-    border: 1px dashed color-mix(in srgb, var(--accent) 22%, var(--border));
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--accent) 4%, #ffffff);
-    padding: 10px 12px 12px;
-}
-
-.settings-env-details > summary {
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--ink);
-    user-select: none;
-}
-
-.settings-env-sections {
+.settings-env-toolbar {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 12px;
-    margin-top: 10px;
+    grid-template-columns: minmax(280px, 0.92fr) minmax(340px, 1.08fr);
+    gap: 12px 14px;
+    align-items: end;
 }
 
-.settings-env-section {
+.settings-env-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.settings-env-field-select .settings-inline-select,
+.settings-env-field-search .settings-inline-input {
+    width: 100%;
+}
+
+.settings-env-field-select .inline-select.settings-inline-select {
+    min-width: 0;
+}
+
+.settings-env-workbench {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--border));
+    background:
+        radial-gradient(
+            circle at top right,
+            color-mix(in srgb, var(--accent) 10%, transparent),
+            transparent 36%
+        ),
+        linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--surface) 74%, #ffffff),
+            color-mix(in srgb, var(--surface-2) 58%, #ffffff)
+        );
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.7),
+        0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.settings-env-active-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+}
+
+.settings-env-title-group {
     display: flex;
     flex-direction: column;
     gap: 6px;
     min-width: 0;
 }
 
-.settings-env-chip-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    min-width: 0;
-}
-
-.settings-env-chip {
-    display: inline-flex;
-    align-items: center;
-    min-height: 28px;
-    padding: 0 10px;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
-    background: color-mix(in srgb, var(--surface-2) 84%, #ffffff);
+.settings-env-title {
     color: var(--ink);
-    font-size: 11px;
-    line-height: 1.35;
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     overflow-wrap: anywhere;
 }
 
-.settings-env-chip[data-mode="restart"] {
-    border-style: dashed;
+.settings-env-key {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+    background: color-mix(in srgb, var(--surface) 48%, #ffffff);
+    color: color-mix(in srgb, var(--ink) 88%, var(--accent));
+    font-size: 12px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
-.settings-env-chip[data-scope="web"],
-.settings-env-chip[data-scope="desktop"] {
-    background: color-mix(in srgb, var(--accent) 7%, #ffffff);
+.settings-env-edit-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 14px;
+    align-items: end;
+}
+
+.settings-env-value-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.settings-env-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.settings-env-actions > button {
+    min-width: 104px;
+}
+
+.settings-env-value-field .settings-inline-input {
+    width: 100%;
+    min-height: 42px;
+}
+
+.settings-env-meta {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+    background: color-mix(in srgb, var(--accent) 10%, #ffffff);
+    color: color-mix(in srgb, var(--accent) 72%, var(--ink));
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.settings-env-hint {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.settings-env-description {
+    color: color-mix(in srgb, var(--ink) 68%, var(--muted));
+    font-size: 12px;
+    line-height: 1.55;
 }
 
 .settings-card-background {
@@ -937,19 +1017,44 @@ body[data-theme="dark"] #pageSettings .settings-inline-number::placeholder {
     color: color-mix(in srgb, var(--muted) 82%, #becbdb);
 }
 
-body[data-theme="dark"] #pageSettings .settings-env-details {
-    border-color: color-mix(in srgb, var(--accent) 20%, var(--border));
-    background: linear-gradient(180deg, #131f30, #0f1827);
+body[data-theme="dark"] #pageSettings .settings-env-workbench {
+    border-color: color-mix(in srgb, var(--accent) 14%, var(--border));
+    background:
+        radial-gradient(
+            circle at top right,
+            color-mix(in srgb, var(--accent) 18%, transparent),
+            transparent 34%
+        ),
+        linear-gradient(180deg, #142132, #0e1724);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 12px 28px rgba(2, 6, 23, 0.22);
 }
 
-body[data-theme="dark"] #pageSettings .settings-env-details > summary,
-body[data-theme="dark"] #pageSettings .settings-env-chip {
+body[data-theme="dark"] #pageSettings .settings-env-title,
+body[data-theme="dark"] #pageSettings .settings-env-key,
+body[data-theme="dark"] #pageSettings .settings-env-meta {
     color: var(--ink);
 }
 
-body[data-theme="dark"] #pageSettings .settings-env-chip {
-    border-color: color-mix(in srgb, var(--accent) 16%, var(--border));
-    background: linear-gradient(180deg, #162335, #101927);
+body[data-theme="dark"] #pageSettings .settings-env-key {
+    border-color: color-mix(in srgb, var(--accent) 18%, var(--border));
+    background: linear-gradient(180deg, #1a2739, #121d2d);
+    color: color-mix(in srgb, var(--accent) 72%, #d8e7ff);
+}
+
+body[data-theme="dark"] #pageSettings .settings-env-meta {
+    border-color: color-mix(in srgb, var(--accent) 18%, var(--border));
+    background: linear-gradient(180deg, #19304c, #13253d);
+    color: color-mix(in srgb, var(--accent) 74%, #d8e7ff);
+}
+
+body[data-theme="dark"] #pageSettings .settings-env-hint {
+    color: color-mix(in srgb, var(--muted) 88%, #d0dceb);
+}
+
+body[data-theme="dark"] #pageSettings .settings-env-description {
+    color: color-mix(in srgb, var(--ink) 72%, #d8e7ff);
 }
 
 body[data-theme="dark"] #pageSettings .settings-row-actions .hint {

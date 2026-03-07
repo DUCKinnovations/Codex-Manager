@@ -614,58 +614,6 @@
                                     </div>
                                 </div>
 
-                                <div
-                                    class="settings-top-item settings-top-item-security"
-                                >
-                                    <label
-                                        class="hint settings-field-label settings-top-label"
-                                        for="webAccessPasswordInput"
-                                    >
-                                        <span>Web 访问密码</span>
-                                    </label>
-                                    <div
-                                        class="settings-top-main settings-row-actions settings-security-main"
-                                    >
-                                        <input
-                                            id="webAccessPasswordInput"
-                                            class="settings-inline-input mono"
-                                            type="password"
-                                            autocomplete="new-password"
-                                            placeholder="留空表示关闭保护"
-                                        />
-                                        <input
-                                            id="webAccessPasswordConfirm"
-                                            class="settings-inline-input mono"
-                                            type="password"
-                                            autocomplete="new-password"
-                                            placeholder="再次输入以确认"
-                                        />
-                                    </div>
-                                    <div
-                                        class="settings-top-aside settings-row-actions settings-security-actions"
-                                    >
-                                        <button
-                                            id="webAccessPasswordSave"
-                                            class="secondary"
-                                            type="button"
-                                        >
-                                            保存
-                                        </button>
-                                        <button
-                                            id="webAccessPasswordClear"
-                                            class="ghost"
-                                            type="button"
-                                        >
-                                            清除
-                                        </button>
-                                        <div
-                                            id="webAccessPasswordHint"
-                                            class="hint"
-                                        >
-                                            当前未启用 Web 访问密码。
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
 
                             <div class="settings-proxy-strip">
@@ -757,90 +705,6 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div
-                                class="panel settings-card settings-card-env"
-                            >
-                                <div class="panel-header">
-                                    <div>
-                                        <h3>高级环境变量覆盖</h3>
-                                        <p>
-                                            将额外的
-                                            <code>CODEXMANAGER_*</code>
-                                            配置持久化到
-                                            <code>app_settings</code>
-                                        </p>
-                                    </div>
-                                </div>
-                                <label
-                                    class="hint settings-field-label"
-                                    for="envOverridesInput"
-                                >
-                                    每行一个
-                                    <code>KEY=VALUE</code>，支持
-                                    <code>#</code> 注释；空值表示清除该键。
-                                </label>
-                                <textarea
-                                    id="envOverridesInput"
-                                    class="settings-inline-textarea mono"
-                                    rows="8"
-                                    placeholder="CODEXMANAGER_UPSTREAM_COOKIE=cf_clearance=...\nCODEXMANAGER_UPSTREAM_TOTAL_TIMEOUT_MS=120000"
-                                ></textarea>
-                                <div class="settings-row settings-row-actions">
-                                    <button
-                                        id="envOverridesSave"
-                                        class="secondary"
-                                        type="button"
-                                    >
-                                        保存覆盖
-                                    </button>
-                                    <div id="envOverridesHint" class="hint">
-                                        保存后会回灌到当前 service
-                                        进程；启动类配置通常需要重启。
-                                    </div>
-                                </div>
-                                <details class="settings-env-details">
-                                    <summary>已识别的环境变量范围</summary>
-                                    <div class="settings-env-sections">
-                                        <div class="settings-env-section">
-                                            <div class="hint">
-                                                当前 service 可热加载
-                                            </div>
-                                            <div
-                                                id="envOverrideCatalogRuntime"
-                                                class="settings-env-chip-list"
-                                            ></div>
-                                        </div>
-                                        <div class="settings-env-section">
-                                            <div class="hint">
-                                                需重启相关进程
-                                            </div>
-                                            <div
-                                                id="envOverrideCatalogRestart"
-                                                class="settings-env-chip-list"
-                                            ></div>
-                                        </div>
-                                        <div class="settings-env-section">
-                                            <div class="hint">
-                                                已有专用设置项
-                                            </div>
-                                            <div
-                                                id="envOverrideReservedKeys"
-                                                class="settings-env-chip-list"
-                                            ></div>
-                                        </div>
-                                        <div class="settings-env-section">
-                                            <div class="hint">
-                                                不能通过数据库接管
-                                            </div>
-                                            <div
-                                                id="envOverrideUnsupportedKeys"
-                                                class="settings-env-chip-list"
-                                            ></div>
-                                        </div>
-                                    </div>
-                                </details>
                             </div>
 
                             <div
@@ -1113,6 +977,118 @@
                                         class="theme-panel"
                                         aria-label="主题切换"
                                     ></div>
+                                </div>
+                            </div>
+
+                            <div
+                                class="panel settings-card settings-card-env"
+                            >
+                                <div class="panel-header">
+                                    <div>
+                                        <h3>高级环境变量覆盖</h3>
+                                        <p>
+                                            从数据库直接维护可编辑的
+                                            <code>CODEXMANAGER_*</code>
+                                            配置
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="settings-env-toolbar">
+                                    <label
+                                        class="settings-env-field settings-env-field-select"
+                                        for="envOverrideSelect"
+                                    >
+                                        <span class="hint settings-field-label"
+                                            >选择变量</span
+                                        >
+                                        <select
+                                            id="envOverrideSelect"
+                                            class="inline-select settings-inline-select"
+                                        ></select>
+                                    </label>
+                                    <label
+                                        class="settings-env-field settings-env-field-search"
+                                        for="envOverrideSearchInput"
+                                    >
+                                        <span class="hint settings-field-label"
+                                            >搜索变量</span
+                                        >
+                                        <input
+                                            id="envOverrideSearchInput"
+                                            class="settings-inline-input"
+                                            type="search"
+                                            placeholder="按中文名称或变量名搜索"
+                                        />
+                                    </label>
+                                </div>
+                                <div class="settings-env-workbench">
+                                    <div class="settings-env-active-head">
+                                        <div class="settings-env-title-group">
+                                            <div
+                                                id="envOverrideNameValue"
+                                                class="settings-env-title"
+                                            >
+                                                未选择
+                                            </div>
+                                            <code
+                                                id="envOverrideKeyValue"
+                                                class="settings-env-key mono"
+                                                >-</code
+                                            >
+                                        </div>
+                                        <div
+                                            id="envOverrideMeta"
+                                            class="settings-env-meta"
+                                        >
+                                            请先选择变量
+                                        </div>
+                                    </div>
+                                    <div class="settings-env-edit-row">
+                                        <label
+                                            class="settings-env-value-field"
+                                            for="envOverrideValueInput"
+                                        >
+                                            <span
+                                                class="hint settings-field-label"
+                                                >当前值</span
+                                            >
+                                            <input
+                                                id="envOverrideValueInput"
+                                                class="settings-inline-input mono"
+                                                type="text"
+                                                placeholder="输入当前变量值"
+                                            />
+                                        </label>
+                                        <div class="settings-env-actions">
+                                            <button
+                                                id="envOverridesSave"
+                                                class="secondary"
+                                                type="button"
+                                            >
+                                                保存
+                                            </button>
+                                            <button
+                                                id="envOverrideReset"
+                                                class="ghost"
+                                                type="button"
+                                            >
+                                                恢复默认
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="hint settings-env-hint"
+                                    >
+                                        <div id="envOverridesHint">
+                                            选择变量后可直接修改值；恢复默认会回退到启动时环境值或内置默认值。
+                                        </div>
+                                        <div
+                                            id="envOverrideDescription"
+                                            class="settings-env-description"
+                                        >
+                                            这里会显示当前变量的作用说明。
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
