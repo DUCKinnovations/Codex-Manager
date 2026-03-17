@@ -111,7 +111,8 @@
 
 待做：
 
-- [ ] 继续核对 compact 专用头部和 cookie 行为
+- [x] compact 默认补 `x-openai-subagent=compact`，与官方 `compact_remote` 保持一致
+- [ ] 继续核对 compact 其余专用头部和 cookie 行为
 - [x] compact 上游 `2xx` 假成功体改判为 `502`，避免 HTML/challenge/异常 JSON 透传成功
 - [x] compact 上游 `403/5xx` 的 HTML/challenge 页改成结构化 JSON 错误返回，不再透传整页 HTML
 - [ ] 继续细化 compact 失败时的 fallback 与日志诊断

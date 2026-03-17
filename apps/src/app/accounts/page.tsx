@@ -132,7 +132,7 @@ export default function AccountsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [addAccountModalOpen, setAddAccountModalOpen] = useState(false);
   const [usageModalOpen, setUsageModalOpen] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
   const [deleteDialogState, setDeleteDialogState] = useState<
     | { kind: "single"; account: Account }
     | { kind: "selected"; ids: string[]; count: number }
@@ -167,6 +167,11 @@ export default function AccountsPage() {
     const offset = (safePage - 1) * pageSizeNumber;
     return filteredAccounts.slice(offset, offset + pageSizeNumber);
   }, [filteredAccounts, pageSizeNumber, safePage]);
+
+  const selectedAccount = useMemo(
+    () => accounts.find((account) => account.id === selectedAccountId) ?? null,
+    [accounts, selectedAccountId]
+  );
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -206,7 +211,7 @@ export default function AccountsPage() {
   };
 
   const openUsage = (account: Account) => {
-    setSelectedAccount(account);
+    setSelectedAccountId(account.id);
     setUsageModalOpen(true);
   };
 
@@ -632,7 +637,12 @@ export default function AccountsPage() {
       <UsageModal
         account={selectedAccount}
         open={usageModalOpen}
-        onOpenChange={setUsageModalOpen}
+        onOpenChange={(open) => {
+          setUsageModalOpen(open);
+          if (!open) {
+            setSelectedAccountId("");
+          }
+        }}
         onRefresh={refreshAccount}
         isRefreshing={
           isRefreshingAllAccounts ||

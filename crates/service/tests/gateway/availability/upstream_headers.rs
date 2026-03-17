@@ -192,6 +192,26 @@ fn codex_compact_header_profile_matches_remote_compact_shape() {
 }
 
 #[test]
+fn codex_compact_header_profile_defaults_subagent_to_compact() {
+    let headers = build_codex_compact_upstream_headers(CodexCompactUpstreamHeaderInput {
+        auth_token: "token-compact-default",
+        account_id: None,
+        include_account_id: false,
+        upstream_cookie: None,
+        incoming_session_id: Some("session-compact-default"),
+        incoming_subagent: None,
+        fallback_session_id: Some("fallback-session"),
+        strip_session_affinity: false,
+        has_body: true,
+    });
+
+    assert_eq!(
+        find_header(&headers, "x-openai-subagent").as_deref(),
+        Some("compact")
+    );
+}
+
+#[test]
 fn codex_header_profile_uses_dynamic_originator_and_residency_requirement() {
     let _guard = header_runtime_guard();
     let _restore = GatewayHeaderRuntimeRestore::capture();

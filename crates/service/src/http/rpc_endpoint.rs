@@ -1,5 +1,7 @@
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response as AxumResponse};
+use codexmanager_core::rpc::types::{JsonRpcRequest, JsonRpcResponse};
+use std::panic::AssertUnwindSafe;
 use tiny_http::Request;
 use tiny_http::Response;
 use url::Url;
@@ -40,18 +42,58 @@ fn is_loopback_origin(origin: &str) -> bool {
     matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"))
 }
 
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return (*message).to_string();
+    }
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "unknown panic payload".to_string()
+}
+
+fn handle_parsed_rpc_request<F>(req: JsonRpcRequest, handler: F) -> (String, bool)
+where
+    F: FnOnce(JsonRpcRequest) -> JsonRpcResponse,
+{
+    let request_id = req.id;
+    let request_method = req.method.clone();
+    match std::panic::catch_unwind(AssertUnwindSafe(|| handler(req))) {
+        Ok(resp) => {
+            let success = !rpc_response_failed(&resp);
+            let json = serde_json::to_string(&resp).unwrap_or_else(|_| "{}".to_string());
+            (json, success)
+        }
+        Err(payload) => {
+            let panic_message = panic_payload_message(payload.as_ref());
+            log::error!(
+                "rpc handler panicked: method={} id={} panic={}",
+                request_method,
+                request_id,
+                panic_message
+            );
+            let resp = JsonRpcResponse {
+                id: request_id,
+                result: crate::error_codes::rpc_error_payload(format!(
+                    "internal_error: {panic_message}"
+                )),
+            };
+            let json = serde_json::to_string(&resp).unwrap_or_else(|_| "{}".to_string());
+            (json, false)
+        }
+    }
+}
+
 fn handle_rpc_body(body: &str) -> (u16, String, bool) {
     if body.trim().is_empty() {
         return (400, "{}".to_string(), false);
     }
 
-    let req: codexmanager_core::rpc::types::JsonRpcRequest = match serde_json::from_str(body) {
+    let req: JsonRpcRequest = match serde_json::from_str(body) {
         Ok(v) => v,
         Err(_) => return (400, "{}".to_string(), false),
     };
-    let resp = crate::handle_request(req);
-    let success = !rpc_response_failed(&resp);
-    let json = serde_json::to_string(&resp).unwrap_or_else(|_| "{}".to_string());
+    let (json, success) = handle_parsed_rpc_request(req, crate::handle_request);
     (200, json, success)
 }
 
@@ -110,7 +152,22 @@ pub(crate) async fn handle_rpc_http(headers: HeaderMap, body: String) -> AxumRes
     if let Some(response) = validate_axum_headers(&headers) {
         return response;
     }
-    let (status, response_body, success) = handle_rpc_body(&body);
+    let body_for_task = body;
+    let (status, response_body, success) =
+        match tokio::task::spawn_blocking(move || handle_rpc_body(&body_for_task)).await {
+            Ok(result) => result,
+            Err(err) => {
+                log::error!("rpc http blocking task failed: {}", err);
+                let fallback = JsonRpcResponse {
+                    id: 0,
+                    result: crate::error_codes::rpc_error_payload(
+                        "internal_error: rpc task failed".to_string(),
+                    ),
+                };
+                let body = serde_json::to_string(&fallback).unwrap_or_else(|_| "{}".to_string());
+                (200, body, false)
+            }
+        };
     if success {
         rpc_metrics_guard.mark_success();
     }
@@ -173,4 +230,67 @@ pub fn handle_rpc(mut request: Request) {
         rpc_metrics_guard.mark_success();
     }
     let _ = request.respond(Response::from_string(response_body).with_status_code(status));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::handle_parsed_rpc_request;
+    use codexmanager_core::rpc::types::{JsonRpcRequest, JsonRpcResponse};
+
+    #[test]
+    fn panicking_rpc_handler_returns_structured_json_error() {
+        let request = JsonRpcRequest {
+            id: 7,
+            method: "account/usage/refresh".to_string(),
+            params: None,
+        };
+
+        let (body, success) = handle_parsed_rpc_request(request, |_req| {
+            panic!("usage refresh boom");
+        });
+
+        assert!(!success);
+
+        let parsed: serde_json::Value = serde_json::from_str(&body).expect("json body");
+        assert_eq!(parsed.get("id").and_then(|value| value.as_u64()), Some(7));
+        assert_eq!(
+            parsed
+                .get("result")
+                .and_then(|value| value.get("error"))
+                .and_then(|value| value.as_str()),
+            Some("internal_error: usage refresh boom")
+        );
+        assert_eq!(
+            parsed
+                .get("result")
+                .and_then(|value| value.get("errorCode"))
+                .and_then(|value| value.as_str()),
+            Some("unknown_error")
+        );
+    }
+
+    #[test]
+    fn normal_rpc_handler_keeps_success_shape() {
+        let request = JsonRpcRequest {
+            id: 9,
+            method: "noop".to_string(),
+            params: None,
+        };
+
+        let (body, success) = handle_parsed_rpc_request(request, |req| JsonRpcResponse {
+            id: req.id,
+            result: serde_json::json!({ "ok": true }),
+        });
+
+        assert!(success);
+        let parsed: serde_json::Value = serde_json::from_str(&body).expect("json body");
+        assert_eq!(parsed.get("id").and_then(|value| value.as_u64()), Some(9));
+        assert_eq!(
+            parsed
+                .get("result")
+                .and_then(|value| value.get("ok"))
+                .and_then(|value| value.as_bool()),
+            Some(true)
+        );
+    }
 }

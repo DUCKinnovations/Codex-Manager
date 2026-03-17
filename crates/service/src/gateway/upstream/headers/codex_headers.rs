@@ -160,13 +160,15 @@ pub(crate) fn build_codex_compact_upstream_headers(
             residency_requirement,
         ));
     }
-    if let Some(subagent) = input
+    let compact_subagent = input
         .incoming_subagent
         .map(str::trim)
         .filter(|value| !value.is_empty())
-    {
-        headers.push(("x-openai-subagent".to_string(), subagent.to_string()));
-    }
+        .unwrap_or("compact");
+    headers.push((
+        "x-openai-subagent".to_string(),
+        compact_subagent.to_string(),
+    ));
     headers.push((
         "session_id".to_string(),
         resolve_session_id(
