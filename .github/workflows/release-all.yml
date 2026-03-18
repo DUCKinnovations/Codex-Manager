@@ -268,7 +268,8 @@ jobs:
           version="$(python3 -c 'import json, pathlib; print(json.loads(pathlib.Path("apps/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))["version"])')"
 
           stage_dir="$(mktemp -d)"
-          trap 'rm -rf "$stage_dir"' EXIT
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$stage_dir" "$temp_dir"' EXIT
 
           ditto "$bundle_dir" "$stage_dir/CodexManager.app"
           ln -s /Applications "$stage_dir/Applications"
@@ -279,7 +280,22 @@ jobs:
           codesign --verify --deep --strict "$stage_dir/CodexManager.app"
 
           dmg_path="${dmg_dir}/CodexManager_${version}_${dmg_arch}.dmg"
-          hdiutil create -volname "CodexManager" -srcfolder "$stage_dir" -ov -format UDZO "$dmg_path"
+          temp_dmg_path="${temp_dir}/CodexManager_${version}_${dmg_arch}.dmg"
+          created=false
+          for attempt in 1 2 3; do
+            rm -f "$temp_dmg_path"
+            hdiutil detach "/Volumes/CodexManager" -force >/dev/null 2>&1 || true
+            sync || true
+            sleep "$attempt"
+            if hdiutil create -volname "CodexManager" -srcfolder "$stage_dir" -ov -format UDZO "$temp_dmg_path"; then
+              created=true
+              break
+            fi
+            echo "hdiutil create failed on attempt ${attempt}, retrying..."
+          done
+
+          $created || { echo "macOS dmg create failed after retries"; exit 1; }
+          mv -f "$temp_dmg_path" "$dmg_path"
           test -f "$dmg_path" || { echo "macOS dmg not created: $dmg_path"; exit 1; }
 
       - name: Stage legacy macOS portable package

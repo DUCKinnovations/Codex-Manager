@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { appClient } from "@/lib/api/app-client";
-import { getAppErrorMessage } from "@/lib/api/transport";
+import { getAppErrorMessage, isTauriRuntime } from "@/lib/api/transport";
 import { useAppStore } from "@/lib/store/useAppStore";
 import {
   APPEARANCE_PRESETS,
@@ -33,6 +33,7 @@ import {
   Globe,
   Info,
   Palette,
+  RefreshCw,
   RotateCcw,
   Save,
   Search,
@@ -128,6 +129,42 @@ function parseIntegerInput(value: string, minimum = 0): number | null {
   return rounded;
 }
 
+type UpdateCheckSummary = {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseTag: string;
+  releaseName: string;
+  reason: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readStringField(source: Record<string, unknown>, key: string): string {
+  const value = source[key];
+  return typeof value === "string" ? value : "";
+}
+
+function readBooleanField(source: Record<string, unknown>, key: string): boolean {
+  return source[key] === true;
+}
+
+function normalizeUpdateCheckSummary(payload: unknown): UpdateCheckSummary {
+  const source = asRecord(payload) ?? {};
+  return {
+    hasUpdate: readBooleanField(source, "hasUpdate"),
+    currentVersion: readStringField(source, "currentVersion"),
+    latestVersion: readStringField(source, "latestVersion"),
+    releaseTag: readStringField(source, "releaseTag"),
+    releaseName: readStringField(source, "releaseName"),
+    reason: readStringField(source, "reason"),
+  };
+}
+
 export default function SettingsPage() {
   const { setAppSettings: setStoreSettings } = useAppStore();
   const { theme, setTheme } = useTheme();
@@ -140,6 +177,8 @@ export default function SettingsPage() {
   const [envDrafts, setEnvDrafts] = useState<Record<string, string>>({});
   const [upstreamProxyDraft, setUpstreamProxyDraft] = useState<string | null>(null);
   const [gatewayOriginatorDraft, setGatewayOriginatorDraft] = useState<string | null>(null);
+  const [isDesktopRuntime, setIsDesktopRuntime] = useState(false);
+  const [lastUpdateCheck, setLastUpdateCheck] = useState<UpdateCheckSummary | null>(null);
   const [transportDraft, setTransportDraft] = useState<
     Partial<Record<"sseKeepaliveIntervalMs" | "upstreamStreamTimeoutMs", string>>
   >({});
@@ -174,6 +213,28 @@ export default function SettingsPage() {
     },
   });
 
+  const checkUpdate = useMutation({
+    mutationFn: () => appClient.checkUpdate(),
+    onSuccess: (result) => {
+      const summary = normalizeUpdateCheckSummary(result);
+      setLastUpdateCheck(summary);
+      if (summary.hasUpdate) {
+        toast.success(
+          `发现新版本 ${summary.latestVersion || summary.releaseTag || "可用"}`
+        );
+        return;
+      }
+      toast.success(
+        summary.reason
+          ? `已检查更新：${summary.reason}`
+          : `当前已是最新版本 ${summary.currentVersion || ""}`.trim()
+      );
+    },
+    onError: (error: unknown) => {
+      toast.error(`检查更新失败: ${getAppErrorMessage(error)}`);
+    },
+  });
+
   useEffect(() => {
     if (!snapshot?.theme) return;
     if (lastSyncedSnapshotThemeRef.current === snapshot.theme) return;
@@ -202,6 +263,10 @@ export default function SettingsPage() {
     if (typeof window === "undefined") return;
     window.sessionStorage.setItem(SETTINGS_ACTIVE_TAB_KEY, activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    setIsDesktopRuntime(isTauriRuntime());
+  }, []);
 
   const filteredEnvCatalog = useMemo(() => {
     const catalog = snapshot?.envOverrideCatalog || [];
@@ -484,6 +549,31 @@ export default function SettingsPage() {
                   checked={snapshot.updateAutoCheck}
                   onCheckedChange={(value) => updateSettings.mutate({ updateAutoCheck: value })}
                 />
+              </div>
+              <div className="flex flex-col gap-3 rounded-2xl border border-border/50 bg-background/45 p-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-1">
+                  <Label>检查更新</Label>
+                  <p className="text-xs text-muted-foreground">
+                    立即检查 GitHub Releases 是否有新版本可用
+                  </p>
+                  {lastUpdateCheck ? (
+                    <p className="text-xs text-muted-foreground">
+                      {lastUpdateCheck.hasUpdate
+                        ? `发现新版本 ${lastUpdateCheck.latestVersion || lastUpdateCheck.releaseTag || "可用"}`
+                        : lastUpdateCheck.reason ||
+                          `当前版本 ${lastUpdateCheck.currentVersion || "未知"} 已是最新`}
+                    </p>
+                  ) : null}
+                </div>
+                <Button
+                  variant="outline"
+                  className="gap-2 self-start md:self-auto"
+                  disabled={!isDesktopRuntime || checkUpdate.isPending}
+                  onClick={() => checkUpdate.mutate()}
+                >
+                  <RefreshCw className={cn("h-4 w-4", checkUpdate.isPending && "animate-spin")} />
+                  检查更新
+                </Button>
               </div>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
