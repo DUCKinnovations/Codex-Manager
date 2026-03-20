@@ -29,6 +29,10 @@ const WEB_COMMAND_MAP: Record<string, WebCommandDescriptor> = {
   service_account_import_by_file: {
     direct: () => pickImportFilesFromBrowser(false),
   },
+  service_account_import_lanu_results: {
+    // Web 模式不支持执行本机脚本，回退为手动选择导入文件
+    direct: () => pickImportFilesFromBrowser(false),
+  },
   service_account_import_by_directory: {
     direct: () => pickImportFilesFromBrowser(true),
   },

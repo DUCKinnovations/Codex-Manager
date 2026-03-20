@@ -1,4 +1,4 @@
-import { invoke, withAddr } from "./transport";
+import { invoke, isTauriRuntime, withAddr } from "./transport";
 import {
   normalizeAccountList,
   normalizeApiKeyCreateResult,
@@ -31,6 +31,9 @@ interface AccountImportResult {
   updated?: number;
   failed?: number;
   fileCount?: number;
+  sourceFile?: string;
+  scriptFile?: string;
+  scriptPython?: string;
   directoryPath?: string;
   contents?: string[];
 }
@@ -132,6 +135,13 @@ export const accountClient = {
       fileCount: picked.fileCount || picked.contents.length,
     };
   },
+  importLanuResults: () =>
+    isTauriRuntime()
+      ? invoke<AccountImportResult>(
+          "service_account_import_lanu_results",
+          withAddr()
+        )
+      : accountClient.importByFile(),
   export: () =>
     invoke<AccountExportResult>("service_account_export_by_account_files", withAddr()),
 

@@ -6,6 +6,19 @@ use std::time::Duration;
 use crate::app_storage::apply_runtime_storage_env;
 use crate::rpc_client::rpc_call;
 
+fn is_truthy_env_flag(raw: &str) -> bool {
+    matches!(
+        raw.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+fn should_skip_embedded_service_start() -> bool {
+    std::env::var("CODEXMANAGER_NO_SERVICE")
+        .map(|value| is_truthy_env_flag(&value))
+        .unwrap_or(false)
+}
+
 pub(super) fn validate_initialize_response(v: &serde_json::Value) -> Result<(), String> {
     // 连接探测必须确认对端确实是 codexmanager-service，避免端口被其他服务占用时误判“已连接”。
     let server_name = v
@@ -32,7 +45,7 @@ pub(super) fn spawn_service_with_addr(
     bind_addr: &str,
     connect_addr: &str,
 ) -> Result<(), String> {
-    if std::env::var("CODEXMANAGER_NO_SERVICE").is_ok() {
+    if should_skip_embedded_service_start() {
         return Ok(());
     }
 
@@ -115,4 +128,22 @@ pub(super) fn wait_for_service_ready(
         }
     }
     Err(last_err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_truthy_env_flag;
+
+    #[test]
+    fn truthy_env_flag_is_strict() {
+        assert!(is_truthy_env_flag("1"));
+        assert!(is_truthy_env_flag("true"));
+        assert!(is_truthy_env_flag(" YES "));
+        assert!(is_truthy_env_flag("On"));
+        assert!(!is_truthy_env_flag(""));
+        assert!(!is_truthy_env_flag("0"));
+        assert!(!is_truthy_env_flag("false"));
+        assert!(!is_truthy_env_flag("no"));
+        assert!(!is_truthy_env_flag("random"));
+    }
 }

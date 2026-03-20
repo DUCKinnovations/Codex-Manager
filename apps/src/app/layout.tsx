@@ -29,11 +29,13 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: appearanceInitScript }} />
         <Providers>
           <AppBootstrap>
-            <div className="flex h-screen overflow-hidden">
+            <div className="app-layout flex h-screen overflow-hidden">
               <Sidebar />
               <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 <Header />
-                <main className="min-w-0 flex-1 overflow-y-auto p-6 no-scrollbar">{children}</main>
+                <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6 no-scrollbar">
+                  <div className="shell-main">{children}</div>
+                </main>
               </div>
             </div>
           </AppBootstrap>

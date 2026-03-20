@@ -16,6 +16,7 @@ import {
   PowerOff,
   RefreshCw,
   Search,
+  ShieldCheck,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -175,6 +176,7 @@ export default function AccountsPage() {
     deleteAccount,
     deleteManyAccounts,
     deleteUnavailableFree,
+    importLanuResults,
     importByFile,
     importByDirectory,
     exportAccounts,
@@ -182,6 +184,7 @@ export default function AccountsPage() {
     isRefreshingAllAccounts,
     isExporting,
     isDeletingMany,
+    isImportingLanuResults,
     manualPreferredAccountId,
     setPreferredAccount,
     clearPreferredAccount,
@@ -230,22 +233,12 @@ export default function AccountsPage() {
     });
   }, [accounts, groupFilter, search, statusFilter]);
 
-  const statusFilterOptions = useMemo(
-    () => [
-      { id: "all" as const, label: `全部 (${accounts.length})` },
-      {
-        id: "available" as const,
-        label: `可用 (${accounts.filter((account) => account.isAvailable).length})`,
-      },
-      {
-        id: "low_quota" as const,
-        label: `低配额 (${accounts.filter((account) => account.isLowQuota).length})`,
-      },
-      {
-        id: "banned" as const,
-        label: `封禁 (${accounts.filter((account) => isBannedAccount(account)).length})`,
-      },
-    ],
+  const availableAccountCount = useMemo(
+    () => accounts.filter((account) => account.isAvailable).length,
+    [accounts],
+  );
+  const lowQuotaAccountCount = useMemo(
+    () => accounts.filter((account) => account.isLowQuota).length,
     [accounts],
   );
   const unavailableFreeAccountCount = useMemo(
@@ -260,6 +253,24 @@ export default function AccountsPage() {
   const bannedAccountCount = useMemo(
     () => accounts.filter((account) => isBannedAccount(account)).length,
     [accounts],
+  );
+  const statusFilterOptions = useMemo(
+    () => [
+      { id: "all" as const, label: `全部 (${accounts.length})` },
+      {
+        id: "available" as const,
+        label: `可用 (${availableAccountCount})`,
+      },
+      {
+        id: "low_quota" as const,
+        label: `低配额 (${lowQuotaAccountCount})`,
+      },
+      {
+        id: "banned" as const,
+        label: `封禁 (${bannedAccountCount})`,
+      },
+    ],
+    [accounts.length, availableAccountCount, lowQuotaAccountCount, bannedAccountCount],
   );
 
   const pageSizeNumber = Number(pageSize) || 20;
@@ -416,15 +427,44 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="metric-chip rounded-2xl p-3">
+          <p className="text-[11px] text-muted-foreground">账号总数</p>
+          <p className="mt-1 text-2xl font-semibold">{accounts.length}</p>
+          <p className="text-[11px] text-muted-foreground">当前筛选 {filteredAccounts.length}</p>
+        </div>
+        <div className="metric-chip rounded-2xl p-3">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5 text-green-500" />
+            可用账号
+          </div>
+          <p className="mt-1 text-2xl font-semibold">{availableAccountCount}</p>
+          <p className="text-[11px] text-muted-foreground">低配额 {lowQuotaAccountCount}</p>
+        </div>
+        <div className="metric-chip rounded-2xl p-3">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+            待清理
+          </div>
+          <p className="mt-1 text-2xl font-semibold">{bannedAccountCount}</p>
+          <p className="text-[11px] text-muted-foreground">
+            不可用 free {unavailableFreeAccountCount}
+          </p>
+        </div>
+      </div>
+
       <Card className="glass-card border-none shadow-md backdrop-blur-md">
-        <CardContent className="grid gap-3 pt-0 lg:grid-cols-[200px_auto_minmax(0,1fr)_auto] lg:items-center">
+        <CardContent className="grid gap-3 pt-0 xl:grid-cols-[minmax(220px,280px)_auto_minmax(0,1fr)_auto] xl:items-center">
           <div className="min-w-0">
-            <Input
-              placeholder="搜索账号名 / 编号..."
-              className="glass-card h-10 rounded-xl px-3"
-              value={search}
-              onChange={(event) => handleSearchChange(event.target.value)}
-            />
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="搜索账号名 / 编号..."
+                className="glass-card h-10 rounded-xl pl-9"
+                value={search}
+                onChange={(event) => handleSearchChange(event.target.value)}
+              />
+            </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
@@ -466,7 +506,9 @@ export default function AccountsPage() {
             </Select>
           </div>
 
-          <div className="hidden min-w-0 lg:block" />
+          <div className="hidden min-w-0 text-right text-xs text-muted-foreground xl:block">
+            已筛选 {filteredAccounts.length} / {accounts.length}
+          </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0 lg:justify-self-end">
             <DropdownMenu>
@@ -501,6 +543,16 @@ export default function AccountsPage() {
                     onClick={() => setAddAccountModalOpen(true)}
                   >
                     <Plus className="mr-2 h-4 w-4" /> 添加账号
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="h-9 rounded-lg px-2"
+                    disabled={isImportingLanuResults}
+                    onClick={() => importLanuResults()}
+                  >
+                    <FileUp className="mr-2 h-4 w-4" /> 一键导入账号
+                    <DropdownMenuShortcut>
+                      {isImportingLanuResults ? "..." : "LANU"}
+                    </DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="h-9 rounded-lg px-2"
@@ -572,7 +624,7 @@ export default function AccountsPage() {
             >
               <RefreshCw
                 className={cn(
-                  "h-4 w-1",
+                  "h-4 w-4",
                   isRefreshingAllAccounts && "animate-spin",
                 )}
               />

@@ -77,6 +77,17 @@ export default function ApiKeysPage() {
     refetchInterval: 5000,
     retry: 1,
   });
+  const enabledApiKeyCount = useMemo(
+    () =>
+      apiKeys.filter((item) => String(item.status).toLowerCase() !== "disabled")
+        .length,
+    [apiKeys],
+  );
+  const totalUsageTokens = useMemo(
+    () =>
+      Object.values(usageByKey).reduce((sum, value) => sum + (value || 0), 0),
+    [usageByKey],
+  );
 
   const openCreateModal = () => {
     setEditingKeyId(null);
@@ -158,6 +169,28 @@ export default function ApiKeysPage() {
           <Button className="h-10 gap-2 shadow-lg shadow-primary/20" onClick={openCreateModal}>
             <Plus className="h-4 w-4" /> 创建密钥
           </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="metric-chip rounded-2xl p-3">
+          <p className="text-[11px] text-muted-foreground">密钥总数</p>
+          <p className="mt-1 text-2xl font-semibold">{apiKeys.length}</p>
+          <p className="text-[11px] text-muted-foreground">网关可调用入口</p>
+        </div>
+        <div className="metric-chip rounded-2xl p-3">
+          <p className="text-[11px] text-muted-foreground">启用状态</p>
+          <p className="mt-1 text-2xl font-semibold">{enabledApiKeyCount}</p>
+          <p className="text-[11px] text-muted-foreground">
+            禁用 {Math.max(apiKeys.length - enabledApiKeyCount, 0)}
+          </p>
+        </div>
+        <div className="metric-chip rounded-2xl p-3">
+          <p className="text-[11px] text-muted-foreground">累计 Token</p>
+          <p className="mt-1 text-2xl font-semibold">
+            {formatCompactNumber(totalUsageTokens, "0")}
+          </p>
+          <p className="text-[11px] text-muted-foreground">当前统计样本</p>
         </div>
       </div>
 

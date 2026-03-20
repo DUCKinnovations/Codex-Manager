@@ -4,8 +4,8 @@
   "packageManager": "pnpm@10.30.3",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
-    "dev:desktop": "next dev --webpack -p 3005",
+    "dev": "next dev",
+    "dev:desktop": "next dev -p 3005",
     "build": "next build",
     "build:desktop": "next build",
     "start": "next start",

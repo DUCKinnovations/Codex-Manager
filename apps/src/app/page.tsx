@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  AlertTriangle,
   BrainCircuit,
   CheckCircle2,
   Database,
@@ -130,7 +131,7 @@ function StatProgressCard({
   const percentage = total > 0 ? Math.min(Math.round((value / total) * 100), 100) : 0;
 
   return (
-    <Card className="glass-card overflow-hidden border-none shadow-md backdrop-blur-md transition-all hover:scale-[1.02]">
+    <Card className="glass-card overflow-hidden border-none shadow-md backdrop-blur-md transition-all hover:-translate-y-0.5">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         <Icon className={cn("h-4 w-4", color)} />
@@ -153,13 +154,80 @@ function StatProgressCard({
 }
 
 export default function DashboardPage() {
-  const { stats, currentAccount, recommendations, requestLogs, isLoading, isServiceReady } =
-    useDashboardStats();
+  const {
+    stats,
+    currentAccount,
+    recommendations,
+    requestLogs,
+    isLoading,
+    isServiceReady,
+    isSyncingSnapshot,
+    isError,
+    error,
+  } = useDashboardStats();
   const poolPrimary = stats.poolRemain?.primary ?? 0;
   const poolSecondary = stats.poolRemain?.secondary ?? 0;
+  const availabilityRate =
+    stats.total > 0 ? Math.round((stats.available / stats.total) * 100) : 0;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
+      <section className="panel-elevated relative overflow-hidden rounded-3xl p-5 md:p-6">
+        <div className="absolute -right-24 -top-24 h-52 w-52 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -bottom-24 left-1/3 h-44 w-44 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+              <Activity className="h-3.5 w-3.5" />
+              账号池运行总览
+            </div>
+            <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+              {isServiceReady ? "服务已连接，正在持续监控额度" : "等待服务启动后展示实时数据"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {isServiceReady
+                ? `当前累计 ${stats.total} 个账号，最近请求日志 ${requestLogs.length} 条。`
+                : "请在顶部开启服务开关，连接成功后自动加载统计与推荐账号。"}
+            </p>
+          </div>
+          <div className="grid w-full gap-2 sm:grid-cols-3 xl:w-[520px]">
+            <div className="metric-chip rounded-2xl p-3">
+              <p className="text-[11px] text-muted-foreground">可用率</p>
+              <p className="mt-1 text-xl font-semibold">{availabilityRate}%</p>
+              <p className="text-[11px] text-muted-foreground">
+                {stats.available}/{stats.total || "--"} 可调用
+              </p>
+            </div>
+            <div className="metric-chip rounded-2xl p-3">
+              <p className="text-[11px] text-muted-foreground">今日令牌</p>
+              <p className="mt-1 text-xl font-semibold">
+                {formatCompactNumber(stats.todayTokens, "0")}
+              </p>
+              <p className="text-[11px] text-muted-foreground">输入 + 输出合计</p>
+            </div>
+            <div className="metric-chip rounded-2xl p-3">
+              <p className="text-[11px] text-muted-foreground">池子覆盖</p>
+              <p className="mt-1 text-xl font-semibold">
+                {stats.poolRemain?.primaryKnownCount ?? 0}/{stats.poolRemain?.primaryBucketCount ?? 0}
+              </p>
+              <p className="text-[11px] text-muted-foreground">5h 分桶有效样本</p>
+            </div>
+          </div>
+        </div>
+        {isSyncingSnapshot ? (
+          <div className="relative mt-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] text-primary">
+            <Activity className="h-3.5 w-3.5 animate-pulse" />
+            正在同步最新快照
+          </div>
+        ) : null}
+        {isError ? (
+          <div className="relative mt-4 flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error instanceof Error ? error.message : "统计数据加载失败，请稍后重试。"}</span>
+          </div>
+        ) : null}
+      </section>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, index) => (
@@ -167,7 +235,7 @@ export default function DashboardPage() {
           ))
         ) : (
           <>
-            <Card className="glass-card overflow-hidden border-none shadow-md backdrop-blur-md transition-all hover:scale-[1.02]">
+            <Card className="glass-card overflow-hidden border-none shadow-md backdrop-blur-md transition-all hover:-translate-y-0.5">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">总账号数</CardTitle>
                 <Users className="h-4 w-4 text-blue-500" />
@@ -200,7 +268,7 @@ export default function DashboardPage() {
               sub="额度耗尽或授权失效"
             />
 
-            <Card className="overflow-hidden border-none bg-primary/10 shadow-md backdrop-blur-md transition-all hover:scale-[1.02]">
+            <Card className="overflow-hidden border-none bg-primary/10 shadow-md backdrop-blur-md transition-all hover:-translate-y-0.5">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-primary">账号池剩余</CardTitle>
                 <PieChart className="h-4 w-4 text-primary" />
@@ -270,7 +338,7 @@ export default function DashboardPage() {
           ) : (
             <Card
               key={card.title}
-              className="glass-card overflow-hidden border-none shadow-md backdrop-blur-md transition-all hover:scale-[1.02]"
+              className="glass-card overflow-hidden border-none shadow-md backdrop-blur-md transition-all hover:-translate-y-0.5"
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{card.title}</CardTitle>

@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Settings as SettingsIcon } from "lucide-react";
+import {
+  FileText,
+  KeyRound,
+  LayoutDashboard,
+  Settings as SettingsIcon,
+  SlidersHorizontal,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { Switch } from "@/components/ui/switch";
@@ -22,6 +30,37 @@ import {
 
 const DEFAULT_SERVICE_ADDR = "localhost:48760";
 
+const PAGE_META: Record<
+  string,
+  { title: string; subtitle: string; icon: LucideIcon }
+> = {
+  "/": {
+    title: "仪表盘",
+    subtitle: "系统状态与账号池总览",
+    icon: LayoutDashboard,
+  },
+  "/accounts": {
+    title: "账号管理",
+    subtitle: "账号筛选、调度与配额维护",
+    icon: Users,
+  },
+  "/apikeys": {
+    title: "平台密钥",
+    subtitle: "网关密钥与模型绑定策略",
+    icon: KeyRound,
+  },
+  "/logs": {
+    title: "请求日志",
+    subtitle: "链路追踪与调用结果排查",
+    icon: FileText,
+  },
+  "/settings": {
+    title: "应用设置",
+    subtitle: "主题、网关与运行参数",
+    icon: SlidersHorizontal,
+  },
+};
+
 export function Header() {
   const { serviceStatus, setServiceStatus, setAppSettings } = useAppStore();
   const pathname = usePathname();
@@ -40,23 +79,14 @@ export function Header() {
     setPortInput(port || "48760");
   }, [serviceStatus.addr]);
 
-  const getPageTitle = () => {
-    const normalizedPathname = pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
-    switch (normalizedPathname) {
-      case "/":
-        return "仪表盘";
-      case "/accounts":
-        return "账号管理";
-      case "/apikeys":
-        return "平台密钥";
-      case "/logs":
-        return "请求日志";
-      case "/settings":
-        return "应用设置";
-      default:
-        return "CodexManager";
-    }
+  const normalizedPathname =
+    pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
+  const pageMeta = PAGE_META[normalizedPathname] || {
+    title: "CodexManager",
+    subtitle: "账号池与网关管理",
+    icon: SlidersHorizontal,
   };
+  const PageIcon = pageMeta.icon;
 
   const persistServiceAddr = async (nextAddr: string) => {
     const normalized = normalizeServiceAddr(nextAddr);
@@ -105,57 +135,79 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 glass-header px-6">
-        <div className="flex min-w-0 shrink-0 items-center gap-4">
-          <h1 className="text-lg font-semibold">{getPageTitle()}</h1>
-          <Badge variant={serviceStatus.connected ? "default" : "secondary"} className="h-5">
-            {serviceStatus.connected ? "服务已连接" : "服务未连接"}
-          </Badge>
-          {serviceStatus.version ? (
-            <span className="text-xs text-muted-foreground">v{serviceStatus.version}</span>
-          ) : null}
-        </div>
-
-        <div className="hidden min-w-0 flex-1 justify-center lg:flex">
-          <DisclaimerTicker />
-        </div>
-
-        <div className="flex shrink-0 items-center gap-4">
-          {isDesktop ? (
-            <div className="flex items-center gap-2 rounded-lg border bg-card/30 px-3 py-1.5 shadow-sm">
-              <span className="text-xs font-medium text-muted-foreground">监听端口</span>
-              <Input
-                className="h-7 w-16 border-none bg-transparent p-0 text-xs font-mono focus-visible:ring-0"
-                placeholder="48760"
-                value={portInput}
-                onChange={(event) => {
-                  const nextPort = event.target.value.replace(/[^\d]/g, "");
-                  setPortInput(nextPort);
-                  if (nextPort) {
-                    setServiceStatus({ addr: `localhost:${nextPort}` });
-                  }
-                }}
-                onBlur={() => void handlePortBlur()}
-              />
-              <div className="mx-1 h-4 w-px bg-border" />
-              <Switch
-                checked={serviceStatus.connected}
-                disabled={isToggling}
-                onCheckedChange={handleToggleService}
-                className="scale-90"
-              />
+      <header className="glass-header sticky top-0 z-30 h-16 px-4 md:px-6">
+        <div className="shell-main flex h-full items-center gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/20">
+              <PageIcon className="h-4 w-4" />
             </div>
-          ) : null}
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold md:text-lg">{pageMeta.title}</h1>
+              <p className="truncate text-[11px] text-muted-foreground">{pageMeta.subtitle}</p>
+            </div>
+            <Badge
+              variant={serviceStatus.connected ? "default" : "secondary"}
+              className="ml-2 hidden h-6 items-center gap-1.5 rounded-full px-2.5 md:inline-flex"
+            >
+              <span
+                className={
+                  serviceStatus.connected
+                    ? "h-1.5 w-1.5 rounded-full bg-emerald-400"
+                    : "h-1.5 w-1.5 rounded-full bg-amber-400"
+                }
+              />
+              {serviceStatus.connected ? "服务在线" : "服务离线"}
+            </Badge>
+            {serviceStatus.version ? (
+              <span className="hidden text-xs text-muted-foreground lg:inline">
+                v{serviceStatus.version}
+              </span>
+            ) : null}
+          </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 gap-2 px-3"
-            onClick={() => setWebPasswordModalOpen(true)}
-          >
-            <SettingsIcon className="h-3.5 w-3.5" />
-            <span className="text-xs">密码</span>
-          </Button>
+          <div className="hidden min-w-0 flex-1 justify-center lg:flex">
+            <DisclaimerTicker />
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+            {isDesktop ? (
+              <div className="panel-elevated flex items-center gap-2 rounded-xl px-3 py-1.5 shadow-sm">
+                <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
+                  监听端口
+                </span>
+                <Input
+                  className="h-7 w-16 border-none bg-transparent p-0 text-xs font-mono focus-visible:ring-0"
+                  placeholder="48760"
+                  value={portInput}
+                  onChange={(event) => {
+                    const nextPort = event.target.value.replace(/[^\d]/g, "");
+                    setPortInput(nextPort);
+                    if (nextPort) {
+                      setServiceStatus({ addr: `localhost:${nextPort}` });
+                    }
+                  }}
+                  onBlur={() => void handlePortBlur()}
+                />
+                <div className="mx-0.5 h-4 w-px bg-border" />
+                <Switch
+                  checked={serviceStatus.connected}
+                  disabled={isToggling}
+                  onCheckedChange={handleToggleService}
+                  className="scale-90"
+                />
+              </div>
+            ) : null}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 rounded-xl px-3"
+              onClick={() => setWebPasswordModalOpen(true)}
+            >
+              <SettingsIcon className="h-3.5 w-3.5" />
+              <span className="text-xs">密码</span>
+            </Button>
+          </div>
         </div>
       </header>
 

@@ -16,6 +16,7 @@ macro_rules! invoke_handler {
             crate::commands::account::transfer::service_account_import,
             crate::commands::account::transfer::service_account_import_by_file,
             crate::commands::account::transfer::service_account_import_by_directory,
+            crate::commands::account::transfer::service_account_import_lanu_results,
             crate::commands::account::transfer::service_account_export_by_account_files,
             crate::commands::account::local::local_account_delete,
             // usage

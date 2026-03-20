@@ -11,6 +11,7 @@ import { useAppStore } from "@/lib/store/useAppStore";
 
 type ImportByDirectoryResult = Awaited<ReturnType<typeof accountClient.importByDirectory>>;
 type ImportByFileResult = Awaited<ReturnType<typeof accountClient.importByFile>>;
+type ImportLanuResultsResult = Awaited<ReturnType<typeof accountClient.importLanuResults>>;
 type ExportResult = Awaited<ReturnType<typeof accountClient.export>>;
 type DeleteUnavailableFreeResult = { deleted?: number };
 
@@ -240,6 +241,30 @@ export function useAccounts() {
     },
   });
 
+  const importLanuResultsMutation = useMutation({
+    mutationFn: () => accountClient.importLanuResults(),
+    onSuccess: async (result: ImportLanuResultsResult) => {
+      if (result?.canceled) {
+        toast.info("已取消导入");
+        return;
+      }
+      await invalidateAll();
+      const sourceFile = String(result?.sourceFile || "").trim();
+      const sourceLabel = sourceFile
+        ? sourceFile.split(/[\\/]/).pop() || sourceFile
+        : "lanu_results.json";
+      const scriptPython = String(result?.scriptPython || "").trim();
+      toast.success(
+        `${buildImportSummaryMessage(result)}（来源: ${sourceLabel}${
+          scriptPython ? `，执行器: ${scriptPython}` : ""
+        }）`
+      );
+    },
+    onError: (error: unknown) => {
+      toast.error(`导入失败: ${getAppErrorMessage(error)}`);
+    },
+  });
+
   const exportMutation = useMutation({
     mutationFn: () => accountClient.export(),
     onSuccess: (result: ExportResult) => {
@@ -300,6 +325,7 @@ export function useAccounts() {
     deleteManyAccounts: (accountIds: string[]) => deleteManyMutation.mutate(accountIds),
     deleteUnavailableFree: () => deleteUnavailableFreeMutation.mutate(),
     importByFile: () => importByFileMutation.mutate(),
+    importLanuResults: () => importLanuResultsMutation.mutate(),
     importByDirectory: () => importByDirectoryMutation.mutate(),
     exportAccounts: () => exportMutation.mutate(),
     setPreferredAccount: (accountId: string) => setManualPreferredMutation.mutate(accountId),
@@ -316,6 +342,7 @@ export function useAccounts() {
         ? refreshAccountMutation.variables
         : "",
     isRefreshingAllAccounts: refreshAllMutation.isPending,
+    isImportingLanuResults: importLanuResultsMutation.isPending,
     isExporting: exportMutation.isPending,
     isDeletingMany: deleteManyMutation.isPending,
     isUpdatingPreferred:
