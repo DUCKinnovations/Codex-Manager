@@ -1,4 +1,4 @@
-import { invoke, isTauriRuntime, withAddr } from "./transport";
+import { invoke, withAddr } from "./transport";
 import {
   normalizeAccountList,
   normalizeApiKeyCreateResult,
@@ -34,8 +34,33 @@ interface AccountImportResult {
   sourceFile?: string;
   scriptFile?: string;
   scriptPython?: string;
+  scriptLog?: string;
+  scriptStderr?: string;
+  scriptElapsedMs?: number;
+  scriptTotalCount?: number;
+  scriptSuccessCount?: number;
+  scriptFailedCount?: number;
   directoryPath?: string;
   contents?: string[];
+}
+
+interface LanuAccountTxtConfigResult {
+  filePath?: string;
+  fileName?: string;
+  content?: string;
+  lineCount?: number;
+  ok?: boolean;
+  bytes?: number;
+}
+
+interface LanuRunStatusResult {
+  running?: boolean;
+  scriptFile?: string;
+  accountTxtFile?: string;
+  scriptPython?: string;
+  scriptLog?: string;
+  scriptStderr?: string;
+  updatedAtMs?: number;
 }
 
 interface AccountExportResult {
@@ -135,13 +160,38 @@ export const accountClient = {
       fileCount: picked.fileCount || picked.contents.length,
     };
   },
-  importLanuResults: () =>
-    isTauriRuntime()
-      ? invoke<AccountImportResult>(
-          "service_account_import_lanu_results",
-          withAddr()
-        )
-      : accountClient.importByFile(),
+  async importLanuResults(): Promise<AccountImportResult> {
+    return invoke<AccountImportResult>(
+      "service_account_import_lanu_results",
+      withAddr(),
+      {
+        timeoutMs: 0,
+        retries: 0,
+      }
+    );
+  },
+  async getLanuConfig(): Promise<LanuAccountTxtConfigResult> {
+    return invoke<LanuAccountTxtConfigResult>(
+      "service_account_lanu_config_get",
+      withAddr()
+    );
+  },
+  async setLanuConfig(content: string, filePath?: string): Promise<LanuAccountTxtConfigResult> {
+    return invoke<LanuAccountTxtConfigResult>(
+      "service_account_lanu_config_set",
+      withAddr({ content, filePath: filePath || null })
+    );
+  },
+  async getLanuRunStatus(): Promise<LanuRunStatusResult> {
+    return invoke<LanuRunStatusResult>(
+      "service_account_lanu_run_status",
+      withAddr(),
+      {
+        timeoutMs: 0,
+        retries: 0,
+      }
+    );
+  },
   export: () =>
     invoke<AccountExportResult>("service_account_export_by_account_files", withAddr()),
 
@@ -286,6 +336,7 @@ export const accountClient = {
       "service_apikey_update_model",
       withAddr({
         keyId,
+        name: params.name || null,
         modelSlug: params.modelSlug || null,
         reasoningEffort: params.reasoningEffort || null,
         serviceTier: params.serviceTier || null,

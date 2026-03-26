@@ -2,7 +2,7 @@ use codexmanager_core::rpc::types::{AccountListParams, JsonRpcRequest, JsonRpcRe
 
 use crate::{
     account_cleanup, account_delete, account_delete_many, account_export, account_import,
-    account_list, account_update, auth_account, auth_login, auth_tokens,
+    account_lanu_import, account_list, account_update, auth_account, auth_login, auth_tokens,
 };
 
 pub(super) fn try_handle(req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
@@ -78,6 +78,23 @@ pub(super) fn try_handle(req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
                 }
             }
             super::value_or_error(account_import::import_account_auth_json(contents))
+        }
+        "account/importLanuResults" => {
+            super::value_or_error(account_lanu_import::import_lanu_results())
+        }
+        "account/lanuConfig/get" => {
+            super::value_or_error(account_lanu_import::get_lanu_account_txt_config())
+        }
+        "account/lanuConfig/set" => {
+            let content = super::str_param(req, "content").unwrap_or("");
+            let file_path = super::str_param(req, "filePath");
+            super::value_or_error(account_lanu_import::save_lanu_account_txt_config(
+                content,
+                file_path,
+            ))
+        }
+        "account/lanuRunStatus" => {
+            super::value_or_error(account_lanu_import::get_lanu_run_status())
         }
         "account/export" => {
             let output_dir = super::str_param(req, "outputDir").unwrap_or("");

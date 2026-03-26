@@ -10,6 +10,8 @@ pub(crate) mod delete_many;
 pub(crate) mod export;
 #[path = "account_import.rs"]
 pub(crate) mod import;
+#[path = "account_lanu_import.rs"]
+pub(crate) mod lanu_import;
 #[path = "account_list.rs"]
 pub(crate) mod list;
 #[path = "account_plan.rs"]

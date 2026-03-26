@@ -66,6 +66,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAccounts } from "@/hooks/useAccounts";
+import {
+  appendScriptLogHistory,
+  type ScriptLogResult,
+} from "@/lib/script-log-history";
 import { cn } from "@/lib/utils";
 import { buildStaticRouteUrl } from "@/lib/utils/static-routes";
 import {
@@ -547,9 +551,20 @@ export default function AccountsPage() {
                   <DropdownMenuItem
                     className="h-9 rounded-lg px-2"
                     disabled={isImportingLanuResults}
-                    onClick={() => importLanuResults()}
+                    onClick={() => {
+                      importLanuResults()
+                        .then((result) => {
+                          if (result && !result.canceled) {
+                            appendScriptLogHistory(result as ScriptLogResult);
+                            toast.success("导入完成，已写入侧边栏“导入日志”");
+                          }
+                        })
+                        .catch(() => {
+                          /* error already handled by hook toast */
+                        });
+                    }}
                   >
-                    <FileUp className="mr-2 h-4 w-4" /> 一键导入账号
+                    <FileUp className="mr-2 h-4 w-4" /> 一键注册并导入
                     <DropdownMenuShortcut>
                       {isImportingLanuResults ? "..." : "LANU"}
                     </DropdownMenuShortcut>
@@ -635,8 +650,8 @@ export default function AccountsPage() {
       </Card>
 
       <Card className="glass-card overflow-hidden border-none py-0 shadow-xl backdrop-blur-md">
-        <CardContent className="p-0">
-          <Table>
+          <CardContent className="p-0">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12 text-center">
@@ -892,8 +907,8 @@ export default function AccountsPage() {
                 })
               )}
             </TableBody>
-          </Table>
-        </CardContent>
+            </Table>
+          </CardContent>
       </Card>
 
       <div className="flex items-center justify-between px-2">
@@ -1046,6 +1061,7 @@ export default function AccountsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

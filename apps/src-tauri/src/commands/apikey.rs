@@ -55,6 +55,7 @@ pub async fn service_apikey_usage_stats(addr: Option<String>) -> Result<serde_js
 pub async fn service_apikey_update_model(
     addr: Option<String>,
     key_id: String,
+    name: Option<String>,
     model_slug: Option<String>,
     reasoning_effort: Option<String>,
     service_tier: Option<String>,
@@ -64,6 +65,7 @@ pub async fn service_apikey_update_model(
 ) -> Result<serde_json::Value, String> {
     let params = serde_json::json!({
       "id": key_id,
+      "name": name,
       "modelSlug": model_slug,
       "reasoningEffort": reasoning_effort,
       "serviceTier": service_tier,

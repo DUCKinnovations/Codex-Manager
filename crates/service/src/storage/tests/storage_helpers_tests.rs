@@ -1,6 +1,6 @@
 use super::{
     clear_storage_cache_for_tests, clear_storage_open_count_for_tests, open_storage_at_path,
-    storage_open_count_for_tests,
+    storage_open_count_for_tests, generate_platform_key,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -59,4 +59,14 @@ fn open_storage_reopens_when_db_path_changes() {
     clear_storage_open_count_for_tests(&db_path_2);
     let _ = std::fs::remove_file(&db_path_1);
     let _ = std::fs::remove_file(&db_path_2);
+}
+
+#[test]
+fn generate_platform_key_uses_sk_prefix_and_alnum_body() {
+    let key = generate_platform_key();
+    assert!(key.starts_with("sk-"));
+    assert_eq!(key.len(), 35);
+
+    let body = &key[3..];
+    assert!(body.chars().all(|ch| ch.is_ascii_alphanumeric()));
 }

@@ -22,6 +22,7 @@ pub(crate) use account::delete as account_delete;
 pub(crate) use account::delete_many as account_delete_many;
 pub(crate) use account::export as account_export;
 pub(crate) use account::import as account_import;
+pub(crate) use account::lanu_import as account_lanu_import;
 pub(crate) use account::list as account_list;
 pub(crate) use account::plan as account_plan;
 pub(crate) use account::status as account_status;

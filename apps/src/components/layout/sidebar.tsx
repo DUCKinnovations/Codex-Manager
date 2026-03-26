@@ -6,6 +6,7 @@ import {
   Users, 
   Key, 
   FileText, 
+  ListChecks,
   Settings, 
   Compass,
   ChevronLeft, 
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { name: "账号管理", hint: "账号池", href: "/accounts/", icon: Users },
   { name: "平台密钥", hint: "网关令牌", href: "/apikeys/", icon: Key },
   { name: "请求日志", hint: "调用追踪", href: "/logs/", icon: FileText },
+  { name: "导入配置", hint: "日志与邮箱", href: "/import-config/", icon: ListChecks },
   { name: "设置", hint: "系统参数", href: "/settings/", icon: Settings },
 ];
 const DESKTOP_NAVIGATION_FALLBACK_MS = 500;

@@ -46,6 +46,7 @@ export default function ApiKeysPage() {
     apiKeys,
     isLoading,
     deleteApiKey,
+    updateApiKey,
     toggleApiKeyStatus,
     refreshModels,
     readApiKeySecret,
@@ -349,7 +350,11 @@ export default function ApiKeysPage() {
 
       <ApiKeyModal
         open={apiKeyModalOpen}
-        onOpenChange={setApiKeyModalOpen}
+        onOpenChange={(open) => {
+          setApiKeyModalOpen(open);
+          if (!open) setEditingKeyId(null);
+        }}
+        onUpdate={updateApiKey}
         apiKey={editingApiKey}
       />
       <ConfirmDialog

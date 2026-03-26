@@ -990,6 +990,49 @@ fn storage_api_keys_include_profile_fields() {
 }
 
 #[test]
+fn storage_can_update_api_key_name() {
+    let storage = Storage::open_in_memory().expect("open in memory");
+    storage.init().expect("init schema");
+
+    storage
+        .insert_api_key(&ApiKey {
+            id: "key-name-1".to_string(),
+            name: Some("old-name".to_string()),
+            model_slug: None,
+            reasoning_effort: None,
+            service_tier: None,
+            client_type: "codex".to_string(),
+            protocol_type: "openai_compat".to_string(),
+            auth_scheme: "authorization_bearer".to_string(),
+            upstream_base_url: None,
+            static_headers_json: None,
+            key_hash: "hash-name-1".to_string(),
+            status: "active".to_string(),
+            created_at: now_ts(),
+            last_used_at: None,
+        })
+        .expect("insert key");
+
+    storage
+        .update_api_key_name("key-name-1", Some("new-name"))
+        .expect("update key name");
+    let renamed = storage
+        .find_api_key_by_id("key-name-1")
+        .expect("find renamed key")
+        .expect("renamed key exists");
+    assert_eq!(renamed.name.as_deref(), Some("new-name"));
+
+    storage
+        .update_api_key_name("key-name-1", None)
+        .expect("clear key name");
+    let cleared = storage
+        .find_api_key_by_id("key-name-1")
+        .expect("find cleared key")
+        .expect("cleared key exists");
+    assert_eq!(cleared.name, None);
+}
+
+#[test]
 fn storage_can_roundtrip_api_key_secret() {
     let storage = Storage::open_in_memory().expect("open in memory");
     storage.init().expect("init schema");

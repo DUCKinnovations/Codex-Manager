@@ -6,6 +6,7 @@ import {
   FileText,
   KeyRound,
   LayoutDashboard,
+  ListChecks,
   Settings as SettingsIcon,
   SlidersHorizontal,
   Users,
@@ -53,6 +54,16 @@ const PAGE_META: Record<
     title: "请求日志",
     subtitle: "链路追踪与调用结果排查",
     icon: FileText,
+  },
+  "/import-config": {
+    title: "导入配置",
+    subtitle: "导入日志与 TXT 邮箱配置",
+    icon: ListChecks,
+  },
+  "/import-logs": {
+    title: "导入配置",
+    subtitle: "导入日志与 TXT 邮箱配置",
+    icon: ListChecks,
   },
   "/settings": {
     title: "应用设置",

@@ -121,6 +121,13 @@ impl Storage {
         Ok(())
     }
 
+    pub fn update_api_key_name(&self, key_id: &str, name: Option<&str>) -> Result<usize> {
+        let affected = self
+            .conn
+            .execute("UPDATE api_keys SET name = ?1 WHERE id = ?2", (name, key_id))?;
+        Ok(affected)
+    }
+
     pub fn update_api_key_model_slug(&self, key_id: &str, model_slug: Option<&str>) -> Result<()> {
         self.conn.execute(
             "UPDATE api_keys SET model_slug = ?1 WHERE id = ?2",

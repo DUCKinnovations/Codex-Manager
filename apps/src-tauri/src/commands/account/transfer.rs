@@ -154,23 +154,14 @@ fn resolve_register_script_path() -> Result<PathBuf, String> {
     ))
 }
 
-fn output_tail(bytes: &[u8], limit: usize) -> String {
-    let text = String::from_utf8_lossy(bytes).trim().to_string();
-    if text.chars().count() <= limit {
-        return text;
-    }
-    let tail = text
-        .chars()
-        .rev()
-        .take(limit)
-        .collect::<String>()
-        .chars()
-        .rev()
-        .collect::<String>();
-    format!("...(tail)\n{tail}")
+struct ScriptRunResult {
+    python: String,
+    stdout: String,
+    stderr: String,
+    elapsed_ms: u128,
 }
 
-fn run_register_script(script_path: &Path) -> Result<String, String> {
+fn run_register_script(script_path: &Path) -> Result<ScriptRunResult, String> {
     let started_at = Instant::now();
     let python_override = std::env::var(ACCOUNT_REGISTER_PYTHON_ENV)
         .ok()
@@ -195,25 +186,31 @@ fn run_register_script(script_path: &Path) -> Result<String, String> {
             .output();
         match output {
             Ok(value) => {
+                let elapsed_ms = started_at.elapsed().as_millis();
+                let stdout_text = String::from_utf8_lossy(&value.stdout).to_string();
+                let stderr_text = String::from_utf8_lossy(&value.stderr).to_string();
                 if value.status.success() {
                     log::info!(
                         "account register script finished: python={} script={} elapsed_ms={}",
                         python,
                         script_path.display(),
-                        started_at.elapsed().as_millis()
+                        elapsed_ms
                     );
-                    return Ok(python);
+                    return Ok(ScriptRunResult {
+                        python,
+                        stdout: stdout_text,
+                        stderr: stderr_text,
+                        elapsed_ms,
+                    });
                 }
-                let stderr = output_tail(&value.stderr, 600);
-                let stdout = output_tail(&value.stdout, 300);
                 return Err(format!(
                     "注册脚本执行失败 (python={python}, exit={:?}): {}\n{}",
                     value.status.code(),
-                    stderr,
-                    if stdout.is_empty() {
+                    stderr_text.chars().rev().take(600).collect::<String>().chars().rev().collect::<String>(),
+                    if stdout_text.trim().is_empty() {
                         String::new()
                     } else {
-                        format!("stdout: {stdout}")
+                        format!("stdout: {}", stdout_text.chars().rev().take(300).collect::<String>().chars().rev().collect::<String>())
                     }
                 ));
             }
@@ -318,17 +315,17 @@ pub async fn service_account_import_by_file(
 pub async fn service_account_import_lanu_results(
     addr: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    let (script_file, script_python, source_file, contents) =
+    let (script_file, run_result, source_file, contents) =
         tauri::async_runtime::spawn_blocking(move || {
             let script_file = resolve_register_script_path()?;
-            let script_python = run_register_script(&script_file)?;
+            let run_result = run_register_script(&script_file)?;
             let source_file = resolve_lanu_results_path()?;
             let contents =
                 read_account_import_contents_from_files(std::slice::from_ref(&source_file))?;
             if contents.is_empty() {
                 return Err(format!("导入文件为空: {}", source_file.display()));
             }
-            Ok((script_file, script_python, source_file, contents))
+            Ok((script_file, run_result, source_file, contents))
         })
         .await
         .map_err(|err| format!("service_account_import_lanu_results task failed: {err}"))??;
@@ -347,8 +344,11 @@ pub async fn service_account_import_lanu_results(
             "scriptFile".to_string(),
             serde_json::json!(script_file.to_string_lossy().to_string()),
         );
-        result.insert("scriptPython".to_string(), serde_json::json!(script_python));
+        result.insert("scriptPython".to_string(), serde_json::json!(&run_result.python));
         result.insert("fileCount".to_string(), serde_json::json!(1));
+        result.insert("scriptLog".to_string(), serde_json::json!(&run_result.stdout));
+        result.insert("scriptStderr".to_string(), serde_json::json!(&run_result.stderr));
+        result.insert("scriptElapsedMs".to_string(), serde_json::json!(run_result.elapsed_ms as u64));
     }
     Ok(import_result)
 }

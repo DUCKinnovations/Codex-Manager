@@ -16,6 +16,11 @@ thread_local! {
     static STORAGE_CACHE: RefCell<Option<CachedStorage>> = const { RefCell::new(None) };
 }
 
+const PLATFORM_KEY_PREFIX: &str = "sk-";
+const PLATFORM_KEY_BODY_LEN: usize = 32;
+const PLATFORM_KEY_ALPHABET: &[u8; 62] =
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
 pub(crate) struct StorageHandle {
     path: String,
     storage: Option<Storage>,
@@ -115,12 +120,25 @@ pub(crate) fn hash_platform_key(key: &str) -> String {
 }
 
 pub(crate) fn generate_platform_key() -> String {
-    // 生成随机平台 Key（十六进制）
-    let mut buf = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut buf);
-    let mut out = String::with_capacity(buf.len() * 2);
-    for b in buf {
-        out.push_str(&format!("{:02x}", b));
+    // 生成 sk- 前缀平台 Key（字母数字），保持高随机熵且便于人工识别。
+    let target_len = PLATFORM_KEY_PREFIX.len() + PLATFORM_KEY_BODY_LEN;
+    let mut out = String::with_capacity(target_len);
+    out.push_str(PLATFORM_KEY_PREFIX);
+
+    let mut buf = [0u8; 64];
+    while out.len() < target_len {
+        rand::rngs::OsRng.fill_bytes(&mut buf);
+        for byte in buf {
+            // 使用拒绝采样，避免取模偏差（62 * 4 = 248）。
+            if byte >= 248 {
+                continue;
+            }
+            let index = (byte % 62) as usize;
+            out.push(PLATFORM_KEY_ALPHABET[index] as char);
+            if out.len() >= target_len {
+                break;
+            }
+        }
     }
     out
 }

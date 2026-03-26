@@ -1,5 +1,5 @@
 use std::fs;
-use std::io;
+use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -176,6 +176,13 @@ fn resolve_addr(var: &str, default: &str) -> String {
         .unwrap_or_else(|| default.to_string())
 }
 
+fn read_env_trim(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
 fn resolve_socket_addrs_best_effort(host_port: &str) -> Vec<SocketAddr> {
     // 优先处理 localhost（避免 DNS 差异/大小写问题）
     let trimmed = host_port.trim();
@@ -239,6 +246,45 @@ fn simple_get_best_effort(addr: &str, path: &str) {
     let _ = stream.set_read_timeout(Some(Duration::from_millis(200)));
     let req = format!("GET {path} HTTP/1.1\r\nHost: {addr_trimmed}\r\nConnection: close\r\n\r\n");
     let _ = stream.write_all(req.as_bytes());
+}
+
+fn simple_get_body_best_effort(addr: &str, path: &str) -> Option<String> {
+    let addr_trimmed = addr.trim();
+    if addr_trimmed.is_empty() {
+        return None;
+    }
+    let addr_trimmed = addr_trimmed.strip_prefix("http://").unwrap_or(addr_trimmed);
+    let addr_trimmed = addr_trimmed
+        .strip_prefix("https://")
+        .unwrap_or(addr_trimmed);
+    let addr_trimmed = addr_trimmed.split('/').next().unwrap_or(addr_trimmed);
+    let sock = resolve_socket_addrs_best_effort(addr_trimmed)
+        .into_iter()
+        .next()?;
+
+    let mut stream = TcpStream::connect_timeout(&sock, Duration::from_millis(500)).ok()?;
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+
+    let req = format!("GET {path} HTTP/1.1\r\nHost: {addr_trimmed}\r\nConnection: close\r\n\r\n");
+    stream.write_all(req.as_bytes()).ok()?;
+
+    let mut buf = Vec::with_capacity(8 * 1024);
+    stream.read_to_end(&mut buf).ok()?;
+    let text = String::from_utf8_lossy(&buf);
+    if let Some((_, body)) = text.split_once("\r\n\r\n") {
+        return Some(body.to_string());
+    }
+    Some(text.to_string())
+}
+
+fn web_reports_missing_ui(addr: &str) -> bool {
+    let Some(body) = simple_get_body_best_effort(addr, "/") else {
+        return false;
+    };
+    body.contains("前端资源未就绪")
+        || body.contains("web root invalid")
+        || body.contains("index.html missing")
 }
 
 fn bin_path(dir: &Path, name: &str) -> PathBuf {
@@ -317,7 +363,20 @@ fn main() {
         }
     }
 
-    // web 若已运行：直接打开浏览器，然后退出（避免占用端口再次启动失败）。
+    // web 若已运行：默认直接复用；但若已处于“前端资源未就绪”占位页，则优先尝试重启。
+    if tcp_probe(&web_addr) {
+        if web_reports_missing_ui(&web_addr) {
+            println!("检测到当前 web 资源未就绪，尝试重启 web...");
+            simple_get_best_effort(&web_addr, "/__quit");
+            for _ in 0..20 {
+                if !tcp_probe(&web_addr) {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        }
+    }
+
     if tcp_probe(&web_addr) {
         println!("web 已在运行，直接打开浏览器。");
         let _ = webbrowser::open(&format!("http://{web_addr}/"));
@@ -331,6 +390,9 @@ fn main() {
     // 让 web 使用与本进程解析到的一致地址，避免 env 文件/系统变量差异导致难以定位。
     web_cmd.env("CODEXMANAGER_SERVICE_ADDR", &service_addr);
     web_cmd.env("CODEXMANAGER_WEB_ADDR", &web_addr);
+    if let Some(web_root) = read_env_trim("CODEXMANAGER_WEB_ROOT") {
+        web_cmd.env("CODEXMANAGER_WEB_ROOT", web_root);
+    }
 
     let mut web_child = match web_cmd.spawn() {
         Ok(v) => v,

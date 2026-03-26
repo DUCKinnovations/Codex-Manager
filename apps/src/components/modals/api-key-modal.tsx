@@ -49,10 +49,11 @@ const SERVICE_TIER_LABELS: Record<string, string> = {
 interface ApiKeyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onUpdate?: (args: { id: string; params: Record<string, unknown> }) => Promise<unknown>;
   apiKey?: ApiKey | null;
 }
 
-export function ApiKeyModal({ open, onOpenChange, apiKey }: ApiKeyModalProps) {
+export function ApiKeyModal({ open, onOpenChange, onUpdate, apiKey }: ApiKeyModalProps) {
   const [name, setName] = useState("");
   const [protocolType, setProtocolType] = useState("openai_compat");
   const [modelSlug, setModelSlug] = useState("");
@@ -148,20 +149,29 @@ export function ApiKeyModal({ open, onOpenChange, apiKey }: ApiKeyModalProps) {
       };
 
       if (apiKey?.id) {
-        await accountClient.updateApiKey(apiKey.id, params);
-        toast.success("密钥配置已更新");
+        if (onUpdate) {
+          await onUpdate({ id: apiKey.id, params });
+        } else {
+          await accountClient.updateApiKey(apiKey.id, params);
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["apikeys"] }),
+            queryClient.invalidateQueries({ queryKey: ["apikey-models"] }),
+            queryClient.invalidateQueries({ queryKey: ["apikey-usage-stats"] }),
+            queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
+          ]);
+          toast.success("密钥配置已更新");
+        }
+        onOpenChange(false);
       } else {
         const result = await accountClient.createApiKey(params);
         setGeneratedKey(result.key);
         toast.success("平台密钥已创建");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["apikeys"] }),
+          queryClient.invalidateQueries({ queryKey: ["apikey-models"] }),
+          queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
+        ]);
       }
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["apikeys"] }),
-        queryClient.invalidateQueries({ queryKey: ["apikey-models"] }),
-        queryClient.invalidateQueries({ queryKey: ["startup-snapshot"] }),
-      ]);
-      if (apiKey?.id) onOpenChange(false);
     } catch (err: unknown) {
       toast.error(
         `操作失败: ${err instanceof Error ? err.message : String(err)}`,

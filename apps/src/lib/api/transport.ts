@@ -30,8 +30,16 @@ const WEB_COMMAND_MAP: Record<string, WebCommandDescriptor> = {
     direct: () => pickImportFilesFromBrowser(false),
   },
   service_account_import_lanu_results: {
-    // Web 模式不支持执行本机脚本，回退为手动选择导入文件
-    direct: () => pickImportFilesFromBrowser(false),
+    rpcMethod: "account/importLanuResults",
+  },
+  service_account_lanu_config_get: {
+    rpcMethod: "account/lanuConfig/get",
+  },
+  service_account_lanu_config_set: {
+    rpcMethod: "account/lanuConfig/set",
+  },
+  service_account_lanu_run_status: {
+    rpcMethod: "account/lanuRunStatus",
   },
   service_account_import_by_directory: {
     direct: () => pickImportFilesFromBrowser(true),
@@ -259,6 +267,9 @@ export function isCommandMissingError(err: unknown): boolean {
   const msg = getAppErrorMessage(err, "").toLowerCase();
   return (
     msg.includes("unknown command") ||
+    msg.includes("unknown method") ||
+    msg.includes("unknown_method") ||
+    msg.includes("method not found") ||
     msg.includes("not found") ||
     msg.includes("is not a registered")
   );

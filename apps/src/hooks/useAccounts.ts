@@ -249,16 +249,7 @@ export function useAccounts() {
         return;
       }
       await invalidateAll();
-      const sourceFile = String(result?.sourceFile || "").trim();
-      const sourceLabel = sourceFile
-        ? sourceFile.split(/[\\/]/).pop() || sourceFile
-        : "lanu_results.json";
-      const scriptPython = String(result?.scriptPython || "").trim();
-      toast.success(
-        `${buildImportSummaryMessage(result)}（来源: ${sourceLabel}${
-          scriptPython ? `，执行器: ${scriptPython}` : ""
-        }）`
-      );
+      toast.success(buildImportSummaryMessage(result));
     },
     onError: (error: unknown) => {
       toast.error(`导入失败: ${getAppErrorMessage(error)}`);
@@ -325,7 +316,7 @@ export function useAccounts() {
     deleteManyAccounts: (accountIds: string[]) => deleteManyMutation.mutate(accountIds),
     deleteUnavailableFree: () => deleteUnavailableFreeMutation.mutate(),
     importByFile: () => importByFileMutation.mutate(),
-    importLanuResults: () => importLanuResultsMutation.mutate(),
+    importLanuResults: () => importLanuResultsMutation.mutateAsync(),
     importByDirectory: () => importByDirectoryMutation.mutate(),
     exportAccounts: () => exportMutation.mutate(),
     setPreferredAccount: (accountId: string) => setManualPreferredMutation.mutate(accountId),

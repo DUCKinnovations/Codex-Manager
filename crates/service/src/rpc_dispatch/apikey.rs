@@ -44,6 +44,7 @@ pub(super) fn try_handle(req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
         ),
         "apikey/updateModel" => {
             let key_id = super::str_param(req, "id").unwrap_or("");
+            let name = super::string_param(req, "name");
             let model_slug = super::string_param(req, "modelSlug");
             let reasoning_effort = super::string_param(req, "reasoningEffort");
             let service_tier = super::string_param(req, "serviceTier");
@@ -52,6 +53,7 @@ pub(super) fn try_handle(req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
             let static_headers_json = super::string_param(req, "staticHeadersJson");
             super::ok_or_error(apikey_update_model::update_api_key_model(
                 key_id,
+                name,
                 model_slug,
                 reasoning_effort,
                 service_tier,
